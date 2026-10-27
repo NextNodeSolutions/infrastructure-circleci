@@ -76,6 +76,14 @@ Rules that the diagram encodes:
 - **The project decides whether it has a development environment.** A development environment with a database has its own cost and lifecycle, so it is not forced on every project. The workflow is static, so the development job starts for every project and halts as soon as it has read `nextnode.toml` when no development environment is declared; such a project still goes through the approval. The intended end state, listed under open points, reads the file before the jobs are chosen and sends a project without a development environment to production straight after the checks.
 - **The approval is the only manual step.** Anyone who can approve in the CircleCI organization can release. Restricting approval to a group is a paid CircleCI feature, so the organization membership is the control.
 
+### Pull request checks
+
+CircleCI reports the workflow through its native GitHub Checks app. A pull request shows the check in GitHub's Checks tab, with a link to the workflow and its job steps in CircleCI. Reporting uses the app installation, not a GitHub token available to project code. No bot comment or GitHub Actions workflow is needed.
+
+Each registered repository requires its branch workflow check before merging into the default branch. The rule accepts reports only from the CircleCI Checks app and requires the branch to be up to date. Deployment approvals and the probe workflow are not pull request requirements. CircleCI's job-level **VCS Status Updates** setting is disabled to avoid publishing the same result twice.
+
+The [CircleCI status updates guide](https://circleci.com/docs/guides/integration/status-updates/) defines the check's name. With the GitHub App integration, it includes the pipeline definition's identifier, so each repository must require its own observed check rather than an organization-wide name. Replacing a pipeline definition requires updating the required check before removing the old definition, or pull requests wait for a check that no longer reports.
+
 `checks` first reads `nextnode.toml` for every environment with the platform package, as the platform user and before any project code, so a file the deployment jobs would refuse fails the pull request instead of `main` or the production job after its approval. It then installs the pnpm version pinned in the project's `package.json`, installs with a frozen lockfile, and runs the project's lint, format check and type check, and its tests when a `test` script exists. It enforces nothing of its own beyond the file, the pin and the lockfile. The contract with a project is the set of scripts, not their content. Even on a branch, project scripts run as a second user of the job, the same way as in the deployment job.
 
 ## The deployment job
@@ -177,7 +185,10 @@ Registration is a script in this repository, run once per repository by a mainta
 
 1. creates the CircleCI project, a pipeline definition whose configuration source is this repository's file on `main` and whose checkout source is the new repository, and a trigger on all pushes;
 2. creates the Infisical project named after the repository with its environments, and adds the machine identity as Viewer;
-3. leaves `nextnode.toml` to the project, which the standards tooling writes.
+3. verifies that the CircleCI Checks GitHub App has access to the repository, then runs a branch pipeline and confirms its native check completes successfully on a pull request;
+4. disables **VCS Status Updates** in the CircleCI project's advanced settings, then verifies a fresh commit receives the native check without duplicate job statuses;
+5. creates a repository-level required-check rule for the observed branch workflow check, bound to the CircleCI Checks app, with an up-to-date branch required and no bypass. The rule targets the default branch and leaves the organization's existing pull request and squash-merge rules intact;
+6. leaves `nextnode.toml` to the project, which the standards tooling writes.
 
 Until the script exists, the same steps are done by hand against the APIs. The identifiers of the shared resources it needs are listed at the end of this page.
 
