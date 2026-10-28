@@ -1,0 +1,3 @@
+message=$(node -p 'require("node:path").resolve(process.argv[1])' "$1")
+cd platform
+pnpm exec commitlint --edit "$message"

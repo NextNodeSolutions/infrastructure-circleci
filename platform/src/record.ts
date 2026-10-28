@@ -1,4 +1,6 @@
-// A table of a configuration or of a JSON response: an object, never an array.
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+import * as v from 'valibot'
+
+export const RecordSchema = v.custom<Record<string, unknown>>(
+	input =>
+		typeof input === 'object' && input !== null && !Array.isArray(input),
+)
