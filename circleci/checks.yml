@@ -515,7 +515,7 @@ jobs:
             # Every fresh copies the original checkout: a mutation left by an earlier attack
             # never reaches a later case's copy.
             checkout=$PWD
-            fresh() { work=$(mktemp -d) && cp -r "$checkout"/. "$work" && cd "$work"; }
+            fresh() { work=$(mktemp -d) && tar -C "$checkout" --exclude=./.git -cf - . | tar -C "$work" -xf - && cd "$work"; }
             refused() {
               if out=$(node "$HOME/platform-src/platform/read.ts" --repository "$CIRCLE_PROJECT_REPONAME" --environment "$NEXTNODE_ENVIRONMENT" --platform "$work/platform" 2>&1); then echo "accepted: $1"; exit 1; fi
               printf '%s\n' "$out" | grep -q "$2" || { echo "the read step failed on $1 for another reason:"; printf '%s\n' "$out"; exit 1; }

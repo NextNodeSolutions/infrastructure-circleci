@@ -10,8 +10,6 @@ const CONFIG_PATH = join(dirname(fileURLToPath(import.meta.url)), "../circleci/c
 const MUTATION = "mutation-of-the-first-attack-case";
 const ORIGINAL = 'name = "probe"\nproject = { name = "probe-project" }\n';
 
-// The attack harness's fresh definition is taken from the configuration text, never
-// reimplemented here: the regression executes the recorded source.
 function harnessLines(config: string): string[] {
   const freshAt = config.indexOf("fresh() { work=$(mktemp -d)");
   assert.ok(freshAt > -1, "the probe harness defines fresh()");
@@ -37,6 +35,7 @@ function flowScript(configText: string, sandbox: string, withCapture: boolean): 
     `cd '${join(sandbox, "checkout")}'`,
     ...lines,
     "fresh",
+    "test ! -e .git",
     `printf '${MUTATION}\\n' >> nextnode.toml`,
     `cp nextnode.toml '${join(sandbox, "after-first.toml")}'`,
     "fresh",
@@ -61,6 +60,8 @@ test("every attack case starts from the original unmodified checkout", (t) => {
   t.after(() => rmSync(sandbox, { recursive: true, force: true }));
   mkdirSync(join(sandbox, "checkout"));
   writeFileSync(join(sandbox, "checkout", "nextnode.toml"), ORIGINAL);
+  mkdirSync(join(sandbox, "checkout", ".git"));
+  writeFileSync(join(sandbox, "checkout", ".git", "metadata"), "excluded-checkout-metadata", { mode: 0o000 });
 
   runFlow(sandbox, flowScript(recordedHarness(), sandbox, true));
 
@@ -76,10 +77,13 @@ test("the regression rejects a harness that copies the current working tree", (t
   mkdirSync(join(sandbox, "checkout"));
   writeFileSync(join(sandbox, "checkout", "nextnode.toml"), ORIGINAL);
 
-  const oldHarness = recordedHarness()
+  const config = recordedHarness();
+  const fresh = harnessLines(config).at(-1);
+  assert.ok(fresh);
+  const oldHarness = config
     .replace("            checkout=$PWD\n", "")
     .replace(
-      'fresh() { work=$(mktemp -d) && cp -r "$checkout"/. "$work" && cd "$work"; }',
+      fresh,
       'fresh() { work=$(mktemp -d) && cp -r . "$work" && cd "$work"; }',
     );
   assert.ok(!oldHarness.includes("checkout=$PWD"), "the old harness shipped no checkout capture");

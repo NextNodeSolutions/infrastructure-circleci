@@ -117,7 +117,6 @@ test("application commands and project-owned package probes run under the projec
   const attack = probe.slice(probe.lastIndexOf("      - project-run:", attackHead));
   assert.ok(attack.startsWith("      - project-run:\n          step: \"Probe: a Wrangler key that names, builds, routes or binds the Worker, and a path outside the repository, are refused\"\n"), "the attack step runs under the project user");
   assert.match(attack, /checkout=\$PWD/);
-  assert.match(attack, /fresh\(\) \{ work=\$\(mktemp -d\) && cp -r "\$checkout"\/\. "\$work" && cd "\$work"; \}/);
   assert.match(attack, /node "\$HOME\/platform-src\/platform\/read\.ts"/);
   assert.match(attack, /toml = require\(process\.argv\[2\] \+ "\/node_modules\/smol-toml"\)/);
   const checks = block("jobs", "checks");
