@@ -249,6 +249,7 @@ commands:
           # environment under names it chooses, so they go by their common prefix.
           # Rewritten in place, from a variable: no second file in the shared directory.
           command: |
+            touch "$BASH_ENV"
             kept=$(cat "$BASH_ENV")
             printf 'unset ${!CIRCLE_OIDC_TOKEN@}\n%s\n' "$kept" > "$BASH_ENV"
   project-run:

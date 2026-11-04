@@ -188,6 +188,24 @@ test("the probe prints the claims, proves its token, removes it, then runs no br
   assert.equal((probe.match(/- isolate-project/g) ?? []).length, 1, "the probe isolates the project exactly once");
 });
 
+for (const initial of ["missing", "existing"]) {
+  test(`job token removal handles ${initial} BASH_ENV and preserves its contents`, context => {
+    const directory = mkdtempSync(join(tmpdir(), "nextnode-token-removal-"));
+    context.after(() => rmSync(directory, { recursive: true, force: true }));
+    const environmentFile = join(directory, "bash-env");
+    if (initial === "existing") writeFileSync(environmentFile, "export KEPT_PROBE=preserved\n");
+    const command = block("commands", "forget-job-token").split("command: |\n")[1];
+    assert.ok(command);
+    const inspect = command + '\nunset KEPT_PROBE\n. "$BASH_ENV"\ntokens=${!CIRCLE_OIDC_TOKEN@}\nprintf "%s|%s" "$tokens" "${KEPT_PROBE-absent}"';
+    const result = spawnSync("bash", ["-eo", "pipefail", "-c", inspect], {
+      encoding: "utf8",
+      env: { PATH: process.env.PATH, BASH_ENV: environmentFile, CIRCLE_OIDC_TOKEN_V2: "probe-marker", CIRCLE_OIDC_TOKEN_V3: "probe-marker" },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, initial === "existing" ? "|preserved" : "|absent");
+  });
+}
+
 test("the checks job removes the job tokens before any code runs", () => {
   const checks = block("jobs", "checks");
   const forget = checks.indexOf("      - forget-job-token");
