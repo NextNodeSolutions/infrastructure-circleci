@@ -6,16 +6,10 @@
 //   node read.ts --repository <name> --environment <name> --platform <directory>
 //   node read.ts --repository <name> --check
 //
-// Runs in the project checkout as the platform user, before any project code. The
-// repository's name, as CircleCI checked it out, names the project everywhere the
-// platform keeps state for it, and names its Workers: a value of the project's files
-// never does. What the file may hold is the schema's; this program adds the rules that
-// depend on the checkout and the repository. A refusal names the key or the rule and
-// exits 1. Exit 3 means the development environment is not declared, which the
-// development job turns into a halt: it is the project's choice, not an error.
-import { readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { closeSync, constants, fstatSync, openSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { basename, extname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { PROJECT_NAME } from "./src/project-name.ts";
 import { parse as parseToml } from "smol-toml";
 import * as v from "valibot";
 import { describe, Environment, ENVIRONMENTS, NextnodeToml, type Wrangler } from "./src/nextnode-toml.ts";
@@ -26,7 +20,6 @@ const NOT_DECLARED = 3;
 const ROOT = realpathSync(".");
 // The repository name names the Pulumi project and, suffixed with the environment, the
 // Worker, which Cloudflare restricts to lowercase letters, digits and dashes.
-const WORKER_NAME = /^[a-z0-9][a-z0-9-]*$/;
 const WORKER_NAME_LENGTH = 63;
 // The keys Wrangler reads as a file or a directory. The generated configuration lives
 // outside the checkout, so they are anchored to the checkout root, and stay inside it.
@@ -49,16 +42,21 @@ function refuse(message: string): never {
 
 function parseFile(): NextnodeToml {
   let source: string;
+  let descriptor: number | undefined;
   try {
-    source = readFileSync("nextnode.toml", "utf8");
+    descriptor = openSync("nextnode.toml", constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+    if (!fstatSync(descriptor).isFile()) refuse("nextnode.toml must be a regular file at the repository root");
+    source = readFileSync(descriptor, "utf8");
   } catch {
-    refuse("nextnode.toml is missing at the repository root");
+    refuse("nextnode.toml must be a readable regular file at the repository root, not a link");
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
   }
   let toml: unknown;
   try {
     toml = parseToml(source);
-  } catch (error) {
-    refuse(`nextnode.toml is not valid TOML: ${error instanceof Error ? error.message : String(error)}`);
+  } catch {
+    refuse("nextnode.toml is not valid TOML; fix its syntax and rerun checks");
   }
   const parsed = v.safeParse(NextnodeToml, toml, { message: (issue) => `must be ${issue.expected}, got ${issue.received}` });
   if (!parsed.success) refuse(describe(parsed.issues));
@@ -94,12 +92,13 @@ function readEnvironment(toml: NextnodeToml, environment: Environment): { spec: 
   const declared = environments[environment];
   if (!declared) return undefined;
   const worker = `${repository}-${environment}`;
-  if (!WORKER_NAME.test(repository) || worker.length > WORKER_NAME_LENGTH) {
+  if (!PROJECT_NAME.test(repository) || worker.length > WORKER_NAME_LENGTH) {
     refuse(`the repository name ${JSON.stringify(repository)} names the Pulumi project and the Worker ${worker}: lowercase letters, digits and dashes, ${WORKER_NAME_LENGTH} characters at most with the environment`);
   }
   const wrangler = wranglerConfig({ ...shared, ...env[environment] }, worker);
   const spec: Spec = {
     project: repository,
+    domains: Object.fromEntries(Object.entries(environments).flatMap(([name, configuration]) => configuration ? [[name, configuration.domain]] : [])),
     environment,
     health: deploy.health,
     migrate: deploy.migrate,
@@ -130,7 +129,7 @@ if (!read) {
   process.exit(environment.output === "development" ? NOT_DECLARED : 1);
 }
 const platform = args.platform ?? "";
-for (const [key, value] of Object.entries(read.spec)) console.log(`${key}=${value}`);
+for (const [key, value] of Object.entries(read.spec)) console.log(`${key}=${typeof value === "object" ? JSON.stringify(value) : value}`);
 console.log(`wrangler configuration: ${JSON.stringify(read.wrangler)}`);
 writeFileSync(join(platform, "nextnode.json"), JSON.stringify(read.spec));
 writeFileSync(join(platform, "wrangler.json"), JSON.stringify(read.wrangler));

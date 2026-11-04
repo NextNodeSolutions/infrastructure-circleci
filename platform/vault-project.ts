@@ -12,7 +12,9 @@ if (!args.name) throw new Error("usage: vault-project.ts --name <repository>");
 const token = process.env.INFISICAL_TOKEN;
 if (!token) throw new Error("INFISICAL_TOKEN is not set");
 
-const response = await fetch("https://app.infisical.com/api/v1/workspace", { headers: { authorization: `Bearer ${token}` } });
+const domain = process.env.INFISICAL_DOMAIN;
+if (!domain) throw new Error("INFISICAL_DOMAIN is not set");
+const response = await fetch(`${domain}/v1/workspace`, { headers: { authorization: `Bearer ${token}` }, redirect: "error" });
 if (!response.ok) throw new Error(`the vault refused the project listing (HTTP ${response.status})`);
 const body: unknown = await response.json();
 const projects = isRecord(body) && Array.isArray(body.workspaces) ? body.workspaces.filter(isRecord) : [];

@@ -4,6 +4,7 @@
 // rule, and the probe job matches refusals on those words.
 import * as v from "valibot";
 import { isRecord } from "./record.ts";
+import { GITHUB_SERVICE } from "./github-service-config.ts";
 
 // The deployment jobs of the pipeline. Production is deployed by every project; a
 // project without a development environment halts that job.
@@ -29,6 +30,7 @@ function loose<const TEntries extends v.ObjectEntries>(entries: TEntries) {
 export const Hostname = v.pipe(
   v.string(),
   v.regex(/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/, (issue) => `must be a hostname, got ${issue.received}`),
+  v.check(hostname => hostname !== GITHUB_SERVICE.hostname, "is reserved for the platform approval service"),
 );
 
 // The route the smoke request targets after each upload.
