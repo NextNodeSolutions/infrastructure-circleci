@@ -35,6 +35,20 @@ test("service preflight proves installation access with approval permissions", a
   assert.deepEqual(grants, [`/app/installations/${probe.event.installation.id}/access_tokens`]);
 });
 
+test("production verification requests a read-only repository token", async context => {
+  const { credentials } = installation(context);
+  context.mock.method(globalThis, "fetch", async (_input: Parameters<typeof fetch>[0], request?: RequestInit): Promise<Response> => {
+    if (request?.method === "GET") return Response.json({ app_id: probe.appId, account: { login: probe.owner }, events: ["check_run"] });
+    const payload: unknown = JSON.parse(String(request?.body));
+    assert.deepEqual(payload, {
+      repositories: [probe.repositoryName],
+      permissions: { checks: "read", pull_requests: "read", members: "read" },
+    });
+    return Response.json({ token: "probe-only-read-token" }, { status: 201 });
+  });
+  await GitHubApi.connect(credentials, probe.repositoryName, "verify");
+});
+
 test("an installation without Check run events cannot pass service preflight", async context => {
   const { credentials, grants } = installation(context, []);
   await assert.rejects(GitHubApi.verifyAccess(credentials), /Check run/);

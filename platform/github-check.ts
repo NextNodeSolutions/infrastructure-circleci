@@ -77,7 +77,7 @@ async function main(): Promise<void> {
   const environment = decode(CircleContext, process.env);
   const spec = readSpec(values.spec);
   if (spec.project !== environment.CIRCLE_PROJECT_REPONAME) throw new ReportingError("The release spec must identify the CircleCI repository");
-  const api = await GitHubApi.connect(process.env, environment.CIRCLE_PROJECT_REPONAME, values.phase === "verify-production" ? "approve" : "report");
+  const api = await GitHubApi.connect(process.env, environment.CIRCLE_PROJECT_REPONAME, values.phase === "verify-production" ? "verify" : "report");
   const checks = new GitHubChecks(api);
   const pull = await checks.mergedPull(environment.CIRCLE_SHA1);
   const release = { workflow: environment.CIRCLE_WORKFLOW_ID, project: environment.CIRCLE_PROJECT_ID, revision: environment.CIRCLE_SHA1, pull: pull.number };
