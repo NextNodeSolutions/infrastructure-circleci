@@ -6,6 +6,22 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
+test("the environment allowlist checks names rather than multiline values", () => {
+  const config = readFileSync(CONFIG_PATH, "utf8");
+  const command = /step: "Probe: the project's environment holds only the listed names"[\s\S]*?command: '([^\n]*)'/.exec(config)?.[1];
+  assert.ok(command);
+  const environment = { PATH: process.env.PATH, SUDO_COMMAND: "bash -c\nset -a\nproject command", APP_PROBE: "application" };
+  const script = "unset __CF_USER_TEXT_ENCODING\n" + command;
+  const accepted = spawnSync("/bin/bash", ["-eo", "pipefail", "-c", script], { encoding: "utf8", env: environment });
+  assert.equal(accepted.status, 0, accepted.stdout + accepted.stderr);
+  const rejected = spawnSync("/bin/bash", ["-eo", "pipefail", "-c", script], {
+    encoding: "utf8", env: { ...environment, E2E_LEAK: "probe-only-private-value" },
+  });
+  assert.equal(rejected.status, 1);
+  assert.match(rejected.stdout, /not in the list: E2E_LEAK/);
+  assert.ok(!rejected.stdout.includes("probe-only-private-value"));
+});
+
 const TERMINATOR = "NNPROJECTRUN";
 const CONFIG_PATH = join(dirname(fileURLToPath(import.meta.url)), "../circleci/checks.yml");
 

@@ -565,7 +565,7 @@ jobs:
       - project-run:
           step: "Probe: the project's environment holds only the listed names"
           # What sudo and bash add to the list is named here; anything else is a leak.
-          command: 'extra=$(env | cut -d= -f1 | grep -vxE "PATH|HOME|CI|npm_config_store_dir|NEXTNODE_ENVIRONMENT|CIRCLE_(BRANCH|SHA1|BUILD_URL|PROJECT_REPONAME)|APP_PROBE|SUDO_(COMMAND|USER|UID|GID|HOME)|USER|LOGNAME|MAIL|SHELL|SHLVL|PWD|OLDPWD|TERM|LANG|LC_[A-Z]+|_" || true); [ -z "$extra" ] || { echo "not in the list: $extra"; exit 1; }'
+          command: 'extra=$(compgen -e | grep -vxE "PATH|HOME|CI|npm_config_store_dir|NEXTNODE_ENVIRONMENT|CIRCLE_(BRANCH|SHA1|BUILD_URL|PROJECT_REPONAME)|APP_PROBE|SUDO_(COMMAND|USER|UID|GID|HOME)|USER|LOGNAME|MAIL|SHELL|SHLVL|PWD|OLDPWD|TERM|LANG|LC_[A-Z]+|_" || true); [ -z "$extra" ] || { echo "not in the list: $extra"; exit 1; }'
       - project-run:
           step: "Probe: the project finds no job token in the platform process that holds one, nor in any process it can inspect"
           command: 'holder=$(node -p "require(\"/home/circleci/probe.json\").holder"); [ -d "/proc/$holder" ] || { echo "the holder process is gone"; exit 1; }; if cat "/proc/$holder/environ" > /dev/null 2>&1; then echo "the project can read the environment of platform process $holder"; exit 1; fi; found=$(grep -Elsaz "^CIRCLE_OIDC_TOKEN[A-Z0-9_]*=|eyJ[A-Za-z0-9_-]+\.eyJ" /proc/[0-9]*/environ || true); [ -z "$found" ] || { echo "a token-shaped value in: $found"; exit 1; }'
