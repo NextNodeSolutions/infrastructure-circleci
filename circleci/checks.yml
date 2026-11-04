@@ -492,7 +492,7 @@ jobs:
             holder=$!
             for pid in $$ "$holder"; do grep -Eqsaz "^CIRCLE_OIDC_TOKEN[A-Z0-9_]*=" "/proc/$pid/environ" || { echo "the platform process $pid does not hold the token: the process probe would prove nothing"; exit 1; }; done
             node -e 'require("node:fs").writeFileSync("/home/circleci/probe.json", JSON.stringify({ bash_env: process.env.BASH_ENV, holder: process.argv[1], agents: process.argv[2] }))' -- "$holder" "$agents"
-            stat -c '%U:%G %a %n' "$BASH_ENV" /home/circleci
+            stat -c '%U:%G %a %n' /home/circleci
       - forget-job-token
       - run:
           name: The probe job runs on the canary only
