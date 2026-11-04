@@ -42,7 +42,7 @@ async function converge(): Promise<automation.OutputMap> {
   if (args.preview) {
     await stack.preview({ onOutput, diff: true, refresh: true });
     lap("preview");
-    return stack.outputs();
+    return {};
   }
   const { outputs } = await stack.up({ onOutput, refresh: true });
   lap("up");
