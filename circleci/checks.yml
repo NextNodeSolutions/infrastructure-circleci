@@ -377,7 +377,7 @@ jobs:
       - run:
           name: Fetch the secrets of << parameters.environment >>
           command: |
-            : "${CIRCLE_OIDC_TOKEN_V3:?this job needs the OIDC token}"
+            : "${CIRCLE_OIDC_TOKEN_V2:?this job needs the OIDC token}"
             : "${INFISICAL_IDENTITY_ID:?}" "${INFISICAL_PLATFORM_PROJECT_ID:?}"
             token=$(node /home/circleci/platform/infrastructure/platform/vault-login.ts)
             export_project() { (cd /home/circleci/platform && infisical --domain "$INFISICAL_DOMAIN" export --token "$token" --projectId "$1" --env "$2" --format json --silent) | node /home/circleci/platform/infrastructure/platform/env-file.ts; }

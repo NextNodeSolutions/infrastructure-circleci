@@ -212,17 +212,17 @@ test("the checks job removes the job tokens before any code runs", () => {
   assert.ok(forget !== -1 && forget < checks.indexOf("      - checkout"), "the token removal must precede the checkout");
 });
 
-test("the vault exchange uses the V3 job token", () => {
+test("the vault exchange uses the V2 token accepted by the deployed identity", () => {
   const login = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "vault-login.ts"), "utf8");
-  assert.match(login, /CIRCLE_OIDC_TOKEN_V3/);
-  assert.ok(!login.includes("CIRCLE_OIDC_TOKEN_V2"), "the exchange must not fall back to the V2 token");
+  assert.match(login, /CIRCLE_OIDC_TOKEN_V2/);
+  assert.ok(!login.includes("CIRCLE_OIDC_TOKEN_V3"), "the exchange must not fall back to a different subject format");
 });
 
-test("the credential exchange guards name the V3 token", () => {
+test("the credential exchange guards name the accepted V2 token", () => {
   const deploy = block("jobs", "deploy");
-  assert.match(deploy, /\$\{CIRCLE_OIDC_TOKEN_V3:\?/, "the deployment exchange must require the V3 token");
+  assert.match(deploy, /\$\{CIRCLE_OIDC_TOKEN_V2:\?/, "the deployment exchange must require the accepted V2 token");
   for (const name of ["deploy", "github-report", "github-service"]) {
-    assert.ok(!block("jobs", name).includes("CIRCLE_OIDC_TOKEN_V2:?"), "no job may keep a V2 prerequisite");
+    assert.ok(!block("jobs", name).includes("CIRCLE_OIDC_TOKEN_V3:?"), "no job may require a different subject format");
   }
 });
 

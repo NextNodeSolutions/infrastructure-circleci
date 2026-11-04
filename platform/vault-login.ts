@@ -2,13 +2,13 @@ import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 
 function main(): void {
-  const { INFISICAL_DOMAIN, INFISICAL_IDENTITY_ID, CIRCLE_OIDC_TOKEN_V3 } = process.env;
-  if (!INFISICAL_DOMAIN || !INFISICAL_IDENTITY_ID || !CIRCLE_OIDC_TOKEN_V3) {
+  const { INFISICAL_DOMAIN, INFISICAL_IDENTITY_ID, CIRCLE_OIDC_TOKEN_V2 } = process.env;
+  if (!INFISICAL_DOMAIN || !INFISICAL_IDENTITY_ID || !CIRCLE_OIDC_TOKEN_V2) {
     throw new Error("Missing vault authentication environment");
   }
   const result = spawnSync("infisical", [
     "--domain", INFISICAL_DOMAIN, "login", "--method=oidc-auth",
-    "--machine-identity-id", INFISICAL_IDENTITY_ID, "--jwt", CIRCLE_OIDC_TOKEN_V3,
+    "--machine-identity-id", INFISICAL_IDENTITY_ID, "--jwt", CIRCLE_OIDC_TOKEN_V2,
     "--plain", "--silent",
   ], {
     cwd: resolve(import.meta.dirname, "../.."),
