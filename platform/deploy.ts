@@ -6,11 +6,10 @@
 // NEXTNODE_STATE_BUCKET, as the deployment job exports them from the vault. The Pulumi
 // CLI and the Cloudflare provider plugin are found through PATH and PULUMI_HOME.
 // Progress goes to stderr; stdout receives the stack outputs as one JSON object.
-import { createHash } from "node:crypto";
 import { parseArgs } from "node:util";
-import * as automation from "@pulumi/pulumi/automation/index.js";
+import type * as automation from "@pulumi/pulumi/automation/index.js";
+import { platformStack } from "./src/platform-stack.ts";
 import { program } from "./src/program.ts";
-import { isRecord } from "./src/record.ts";
 import { readSpec } from "./src/spec.ts";
 
 const { values: args } = parseArgs({
@@ -22,12 +21,6 @@ const { values: args } = parseArgs({
 });
 if (!args.spec || !args.work) throw new Error("usage: deploy.ts --spec <file> --work <dir> [--preview]");
 
-function env(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`${name} is not set`);
-  return value;
-}
-
 // Phase timings on stderr: the job's budget is measured in seconds.
 const started = Date.now();
 let last = started;
@@ -37,47 +30,8 @@ function lap(phase: string, since = last): void {
   last = now;
 }
 
-const token = env("CLOUDFLARE_API_TOKEN");
-const accountId = env("CLOUDFLARE_ACCOUNT_ID");
-const passphrase = env("PULUMI_CONFIG_PASSPHRASE");
-const bucket = env("NEXTNODE_STATE_BUCKET");
 const spec = readSpec(args.spec);
-
-// The state lives in the platform's R2 bucket, behind Pulumi's S3 backend. R2's S3 API
-// accepts the API token itself as a key pair: the token's id as access key and the
-// token's SHA-256 as secret key. One credential creates the resources and keeps their state.
-async function tokenId(): Promise<string> {
-  const response = await fetch("https://api.cloudflare.com/client/v4/user/tokens/verify", {
-    headers: { authorization: `Bearer ${token}` },
-  });
-  const body: unknown = await response.json();
-  const result = isRecord(body) && body.success === true && isRecord(body.result) ? body.result : undefined;
-  if (typeof result?.id !== "string") throw new Error(`Cloudflare did not verify the token (HTTP ${response.status})`);
-  return result.id;
-}
-
-const accessKeyId = await tokenId();
-lap("token verified");
-
-const stack = await automation.LocalWorkspace.createOrSelectStack(
-  { stackName: spec.environment, projectName: spec.project, program: () => program(spec, accountId) },
-  {
-    workDir: args.work,
-    secretsProvider: "passphrase",
-    projectSettings: {
-      name: spec.project,
-      runtime: "nodejs",
-      backend: { url: `s3://${bucket}?endpoint=${accountId}.r2.cloudflarestorage.com&region=auto&s3ForcePathStyle=true` },
-    },
-    envVars: {
-      AWS_ACCESS_KEY_ID: accessKeyId,
-      AWS_SECRET_ACCESS_KEY: createHash("sha256").update(token).digest("hex"),
-      AWS_REGION: "auto",
-      PULUMI_CONFIG_PASSPHRASE: passphrase,
-      CLOUDFLARE_API_TOKEN: token,
-    },
-  },
-);
+const stack = await platformStack({ project: spec.project, environment: spec.environment, work: args.work, program: accountId => program(spec, accountId) });
 lap("stack selected");
 
 // Refreshed in the same run: what disappeared outside Pulumi, such as a domain that went
@@ -88,7 +42,7 @@ async function converge(): Promise<automation.OutputMap> {
   if (args.preview) {
     await stack.preview({ onOutput, diff: true, refresh: true });
     lap("preview");
-    return stack.outputs();
+    return {};
   }
   const { outputs } = await stack.up({ onOutput, refresh: true });
   lap("up");

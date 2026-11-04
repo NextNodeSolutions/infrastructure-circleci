@@ -28,6 +28,8 @@ The file lives at the repository root and holds names only, never a secret value
 | `environments.development.domain` | Hostname of the development environment, attached to its Worker as a custom domain. The zone must belong to the platform's Cloudflare account. | Refused when the section exists. When the whole `environments.development` section is absent, the project has no development environment: the development job halts and the pipeline waits for the approval. |
 | `environments.production.domain` | Hostname of the production environment. | Refused. |
 
+Application domains cannot name the platform's approval service.
+
 The presence of `environments.development` is the project's choice. A development environment with a database has its own cost and lifecycle, so the platform does not force one.
 
 ## The Wrangler keys
