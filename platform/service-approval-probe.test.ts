@@ -75,6 +75,13 @@ test("service configuration writes the deployed webhook key into the GitHub App"
   assert.deepEqual(writes, [{ url: "https://github.nextnode.fr/webhook", content_type: "json", insecure_ssl: "0", secret: probe.webhookKey }]);
 });
 
+test("an initialized stack with an omitted resource list permits first publication", async () => {
+  const stack = { async exportStack(): Promise<unknown> {
+    return { version: 3, deployment: { manifest: {}, secrets_providers: {}, metadata: {} } };
+  } };
+  assert.equal(await stackHasResource(stack, "domain"), false);
+});
+
 test("an interrupted deployment with a recorded domain does not become a first publication", async () => {
   const stack = { async exportStack(): Promise<unknown> {
     return { deployment: { resources: [{ urn: "urn:pulumi:production::platform.nextnode-github::cloudflare:index/workersCustomDomain:WorkersCustomDomain::domain" }] } };
