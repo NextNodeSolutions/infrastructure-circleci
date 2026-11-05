@@ -7,6 +7,8 @@ const API = "https://api.github.com";
 // Release verification needs merge_commit_sha, removed in REST 2026-03-10.
 const API_VERSION = "2022-11-28";
 const TIMEOUT_MS = 15_000;
+const READ_ATTEMPTS = 3;
+const RETRY_DELAY_MS = 1_000;
 const JWT_SECONDS = 9 * 60;
 const CLOCK_SKEW_SECONDS = 60;
 export const PAGE_SIZE = 100;
@@ -36,7 +38,23 @@ export function decode<TSchema extends v.GenericSchema>(schema: TSchema, input: 
   return parsed.output;
 }
 
+function isRetryableRead(method: string, attempt: number, error: unknown): boolean {
+  if (method !== "GET" || attempt >= READ_ATTEMPTS) return false;
+  return !(error instanceof ReportingError) || (error.status ?? 0) >= 500;
+}
+
 async function request(authorization: string, path: string, method: string, body?: unknown): Promise<unknown> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await send(authorization, path, method, body);
+    } catch (error) {
+      if (!isRetryableRead(method, attempt, error)) throw error;
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
+    }
+  }
+}
+
+async function send(authorization: string, path: string, method: string, body?: unknown): Promise<unknown> {
   try {
     const response = await fetch(`${API}${path}`, {
       method,
