@@ -40,7 +40,7 @@ export function decode<TSchema extends v.GenericSchema>(schema: TSchema, input: 
 
 function isRetryableRead(method: string, attempt: number, error: unknown): boolean {
   if (method !== "GET" || attempt >= READ_ATTEMPTS) return false;
-  return !(error instanceof ReportingError) || (error.status ?? 0) >= 500;
+  return error instanceof ReportingError && error.status !== undefined && error.status >= 500;
 }
 
 async function request(authorization: string, path: string, method: string, body?: unknown): Promise<unknown> {
