@@ -31,13 +31,13 @@ export class CircleApproval implements ApprovalCircleCI {
     try {
       const response = await fetch(`${API}${path}`, {
         method, headers: { "Circle-Token": this.token, "Content-Type": "application/json" },
-        redirect: "error", signal: AbortSignal.timeout(TIMEOUT_MS),
+        redirect: "manual", signal: AbortSignal.timeout(TIMEOUT_MS),
       });
       if (!response.ok) throw new ApprovalUnavailable(`CircleCI approval request failed with HTTP ${response.status}`);
       return await response.json();
     } catch (error) {
       if (error instanceof ApprovalUnavailable) throw error;
-      throw new ApprovalUnavailable("CircleCI approval could not complete its API request");
+      throw new ApprovalUnavailable(`CircleCI approval could not complete its API request: ${error instanceof Error ? error.message : "unknown error"}`);
     }
   }
 

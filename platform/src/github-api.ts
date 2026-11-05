@@ -48,14 +48,14 @@ async function request(authorization: string, path: string, method: string, body
         "User-Agent": "nextnode-ci-checks",
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      redirect: "error",
+      redirect: "manual",
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!response.ok) throw new ReportingError(`GitHub reporting failed: ${method} ${path} returned HTTP ${response.status}`, response.status);
     return await response.json();
   } catch (error) {
     if (error instanceof ReportingError) throw error;
-    throw new ReportingError("GitHub reporting could not complete its API request");
+    throw new ReportingError(`GitHub reporting could not complete its API request: ${error instanceof Error ? error.message : "unknown error"}`);
   }
 }
 
