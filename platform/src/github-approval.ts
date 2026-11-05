@@ -63,9 +63,9 @@ export class GitHubApproval implements ApprovalGitHub {
     if (await this.existing(release, head)) return;
     await this.api.write(`/repos/${this.api.repository}/check-runs`, "POST", {
       name: APPROVAL_CHECK, head_sha: head, external_id: JSON.stringify(release),
-      status: "completed", conclusion: "action_required",
-      output: { title: "Production awaits approval from the GitHub Core team", summary: `Approve deployment of merge commit \`${release.revision}\`. Only active members of the GitHub team \`${APPROVERS_TEAM}\` may approve.\n\nCircleCI workflow: \`${release.workflow}\`` },
-      actions: [{ label: "Approve production", description: "Verify Core membership and release", identifier: APPROVAL_ACTION }],
+      status: "completed", conclusion: "neutral", completed_at: new Date().toISOString(),
+      output: { title: "Production is waiting for approval", summary: `**Approve production** releases this pull request to production; the deployment then follows in the **Deploy production** check.\n\nOnly active members of the GitHub team \`${APPROVERS_TEAM}\` can approve.` },
+      actions: [{ label: "Approve production", description: "Release this pull request to production", identifier: APPROVAL_ACTION }],
     });
   }
 
@@ -76,7 +76,7 @@ export class GitHubApproval implements ApprovalGitHub {
     if (!record) throw new ApprovalDenied("The approval record is malformed");
     if (record.approver !== undefined) return;
     await this.api.write(`/repos/${this.api.repository}/check-runs/${check.id}`, "PATCH", {
-      output: { title: "Production approval request failed", summary: reason },
+      output: { title: "Approval was not accepted", summary: `${reason}\n\nOnce the cause is fixed, **Approve production** can be used again.` },
     });
   }
 
@@ -105,8 +105,8 @@ export class GitHubApproval implements ApprovalGitHub {
   async record(approval: Approval, actor: Actor): Promise<void> {
     await this.api.write(`/repos/${this.api.repository}/check-runs/${approval.check.id}`, "PATCH", {
       external_id: JSON.stringify({ ...approval.record, approver: actor.id }), status: "completed", conclusion: "success",
-      output: { title: `GitHub approval recorded for @${actor.login}`, summary: `GitHub verified @${actor.login} as an active member of \`${APPROVERS_TEAM}\`.\n\nApproved merge commit: \`${approval.record.revision}\`\n\nCircleCI workflow: \`${approval.record.workflow}\`\n\nIf CircleCI is still waiting, use Retry release. This check records approval, not a completed deployment.` },
-      actions: [{ label: "Retry release", description: "Retry the approved release", identifier: APPROVAL_ACTION }],
+      output: { title: `Production approved by @${actor.login}`, summary: `@${actor.login} is an active member of the GitHub team \`${APPROVERS_TEAM}\`. Production is deploying; follow it in the **Deploy production** check.\n\nIf that check does not start, **Retry release** resumes the approved release.` },
+      actions: [{ label: "Retry release", description: "Resume the approved release", identifier: APPROVAL_ACTION }],
     });
   }
 }
