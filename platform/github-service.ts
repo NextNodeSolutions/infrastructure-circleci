@@ -19,18 +19,14 @@ const HEALTH_RETRY_MS = 3_000;
 const HEALTH_TIMEOUT_MS = 15_000;
 const WRANGLER_OUTPUT = "wrangler.ndjson";
 const DOMAIN_RESOURCE = "domain";
-type Stage = "worker" | "domain";
 class ServiceDeploymentError extends PlatformError {}
 
-async function resources(accountId: string, stage: Stage): Promise<Record<string, unknown>> {
-  const worker = new cloudflare.Worker("worker", {
-    accountId, name: GITHUB_SERVICE.name,
-    observability: { enabled: GITHUB_SERVICE.observability.enabled, traces: { enabled: GITHUB_SERVICE.observability.traces.enabled } },
-  });
-  if (stage === "worker") return {};
+// Wrangler creates the Worker on its first deployment and uploads every later version,
+// as it does for an application Worker. Pulumi attaches the domain to a Worker that exists.
+async function resources(accountId: string): Promise<Record<string, unknown>> {
   const zone = zoneForDomain(accountId, GITHUB_SERVICE.hostname);
   new cloudflare.WorkersCustomDomain(DOMAIN_RESOURCE, {
-    accountId, zoneId: zone.id, hostname: GITHUB_SERVICE.hostname, service: worker.name,
+    accountId, zoneId: zone.id, hostname: GITHUB_SERVICE.hostname, service: GITHUB_SERVICE.name,
   }, { deleteBeforeReplace: true });
   return { hostname: GITHUB_SERVICE.hostname };
 }
@@ -92,16 +88,13 @@ async function main(): Promise<void> {
   }
   const directory = resolve(values.work);
   mkdirSync(directory, { recursive: true, mode: 0o700 });
-  let stage: Stage = "worker";
-  const stack = await platformStack({ project: `platform.${GITHUB_SERVICE.name}`, environment: "production", work: join(directory, "pulumi"), program: accountId => resources(accountId, stage) });
+  const stack = await platformStack({ project: `platform.${GITHUB_SERVICE.name}`, environment: "production", work: join(directory, "pulumi"), program: resources });
   const onOutput = (output: string): void => { process.stderr.write(output); };
   const secrets = decode(WorkerSecrets, JSON.parse(readFileSync(resolve(values.bindings), "utf8")));
   await GitHubApi.verifyAccess(secrets);
   await new CircleApproval(secrets.CIRCLECI_TOKEN).verifyAccess();
   const hasDomain = await stackHasResource(stack, DOMAIN_RESOURCE);
-  if (!hasDomain) await stack.up({ onOutput, refresh: true });
   await publishVersion(directory, secrets, hasDomain ? "update" : "create");
-  stage = "domain";
   await stack.up({ onOutput, refresh: true });
   await awaitHealth(secrets, new URL(`https://${GITHUB_SERVICE.hostname}`));
   await GitHubApi.configureWebhook(secrets, GITHUB_WEBHOOK, secrets.GITHUB_WEBHOOK_SECRET);
