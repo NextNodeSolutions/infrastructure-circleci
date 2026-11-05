@@ -93,9 +93,11 @@ async function main(): Promise<void> {
   const secrets = decode(WorkerSecrets, JSON.parse(readFileSync(resolve(values.bindings), "utf8")));
   await GitHubApi.verifyAccess(secrets);
   await new CircleApproval(secrets.CIRCLECI_TOKEN).verifyAccess();
+  // A domain deleted with its Worker leaves the state here, so the run deploys afresh.
+  await stack.refresh({ onOutput });
   const hasDomain = await stackHasResource(stack, DOMAIN_RESOURCE);
   await publishVersion(directory, secrets, hasDomain ? "update" : "create");
-  await stack.up({ onOutput, refresh: true });
+  await stack.up({ onOutput });
   await awaitHealth(secrets, new URL(`https://${GITHUB_SERVICE.hostname}`));
   await GitHubApi.configureWebhook(secrets, GITHUB_WEBHOOK, secrets.GITHUB_WEBHOOK_SECRET);
   console.log(`GitHub approval service: https://${GITHUB_SERVICE.hostname}/health`);
