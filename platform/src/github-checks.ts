@@ -34,13 +34,16 @@ export class GitHubChecks {
     const matching = checks.filter(check => check.app.id === this.api.appId && check.external_id === externalId);
     if (matching.length > 1) throw new ReportingError("Multiple checks identify the same deployment workflow");
     const existing = matching[0];
-    const summary = `${report.summary}\n\n[View the main-branch workflow in GitHub](https://github.com/${this.api.repository}/commit/${revision}/checks)\n\nMerge commit: \`${revision}\`\n\nCircleCI workflow: \`${workflow}\``;
+    const isFailure = report.status === "completed" && report.conclusion === "failure";
+    const detailsUrl = isFailure ? `https://github.com/${this.api.repository}/commit/${revision}/checks` : report.url;
+    const summary = isFailure ? `${report.summary}\n\n[Open the main-branch workflow](${detailsUrl}) to read the failed job.` : report.url ? `${report.summary}\n\n[Open ${report.environment}](${report.url})` : report.summary;
     const body = {
       name, external_id: externalId, status: report.status,
       ...(existing ? {} : { head_sha: pull.head.sha }),
+      ...(detailsUrl ? { details_url: detailsUrl } : {}),
       ...(report.status === "completed" ? { conclusion: report.conclusion, completed_at: new Date().toISOString() } : {}),
       ...(report.status === "in_progress" ? { started_at: new Date().toISOString() } : {}),
-      output: { title: report.summary, summary: report.url ? `${summary}\n\n[Open ${report.environment}](${report.url})` : summary, text: "" },
+      output: { title: report.summary, summary },
     };
     await this.api.write(`/repos/${this.api.repository}/check-runs${existing ? `/${existing.id}` : ""}`, existing ? "PATCH" : "POST", body);
     console.log(`${name}: ${report.status === "completed" ? report.conclusion : report.status} https://github.com/${this.api.repository}/pull/${pull.number}/checks`);
