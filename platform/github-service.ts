@@ -7,20 +7,25 @@ import { parseArgs } from 'node:util'
 
 import * as cloudflare from '@pulumi/cloudflare'
 
+import { env } from './src/adapters/cli.ts'
+import { stackHasResource } from './src/adapters/pulumi/checkpoint.ts'
+import { selectStack } from './src/adapters/pulumi/stack.ts'
+import { r2StateBackend } from './src/adapters/pulumi/state-backend.ts'
+import { zoneForDomain } from './src/adapters/pulumi/zone-for-domain.ts'
+import { readUpload } from './src/adapters/wrangler/output.ts'
 import { CircleApproval } from './src/circle-approval.ts'
-import { GitHubApi } from './src/github-api.ts'
+import { recordDeployment } from './src/domain/deployment/upload.ts'
+import { PlatformError } from './src/domain/platform-error.ts'
 import {
 	GITHUB_SERVICE,
 	GITHUB_WEBHOOK,
-	WorkerSecrets,
-} from './src/github-service-config.ts'
+} from './src/domain/service/approval-service.ts'
+import { GitHubApi } from './src/github-api.ts'
+import { WorkerSecrets } from './src/github-service-config.ts'
 import { decode } from './src/github-transport.ts'
-import { PlatformError } from './src/platform-error.ts'
-import { platformStack } from './src/platform-stack.ts'
-import { readDeployment } from './src/read-deployment.ts'
-import { stackHasResource } from './src/stack-has-resource.ts'
-import { MILLISECONDS_PER_SECOND, SECONDS_PER_MINUTE } from './src/time.ts'
-import { zoneForDomain } from './src/zone-for-domain.ts'
+import { MILLISECONDS_PER_SECOND, SECONDS_PER_MINUTE } from './src/lib/time.ts'
+
+import type * as automation from '@pulumi/pulumi/automation/index.js'
 
 const HEALTH_DEADLINE_MINUTES = 10
 const HEALTH_DEADLINE_MS =
@@ -154,8 +159,8 @@ async function publishVersion(
 		['versions', 'upload', '--config', config, '--secrets-file', bindings],
 		directory,
 	)
-	const uploaded = readDeployment(
-		join(directory, WRANGLER_OUTPUT),
+	const uploaded = recordDeployment(
+		readUpload(join(directory, WRANGLER_OUTPUT)),
 		GITHUB_SERVICE.hostname,
 	)
 	if (!uploaded.version)
@@ -196,6 +201,27 @@ function assertServiceRun(): void {
 	}
 }
 
+// The service's own stack, in the platform's project, on the state bucket every stack shares.
+async function serviceStack(workDir: string): Promise<automation.Stack> {
+	const token = env('CLOUDFLARE_API_TOKEN')
+	const accountId = env('CLOUDFLARE_ACCOUNT_ID')
+	const backend = await r2StateBackend({
+		token,
+		accountId,
+		bucket: env('NEXTNODE_STATE_BUCKET'),
+	})
+	return selectStack({
+		project: `platform.${GITHUB_SERVICE.name}`,
+		stackName: 'production',
+		program: resources,
+		accountId,
+		token,
+		passphrase: env('PULUMI_CONFIG_PASSPHRASE'),
+		backend,
+		workDir,
+	})
+}
+
 async function main(): Promise<void> {
 	const { values } = parseArgs({
 		options: { work: { type: 'string' }, bindings: { type: 'string' } },
@@ -207,12 +233,7 @@ async function main(): Promise<void> {
 	assertServiceRun()
 	const directory = resolve(values.work)
 	mkdirSync(directory, { recursive: true, mode: 0o700 })
-	const stack = await platformStack({
-		project: `platform.${GITHUB_SERVICE.name}`,
-		environment: 'production',
-		work: join(directory, 'pulumi'),
-		program: resources,
-	})
+	const stack = await serviceStack(join(directory, 'pulumi'))
 	const onOutput = (output: string): void => {
 		process.stderr.write(output)
 	}

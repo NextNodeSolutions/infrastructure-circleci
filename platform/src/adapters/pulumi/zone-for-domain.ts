@@ -2,6 +2,7 @@ import * as cloudflare from '@pulumi/cloudflare'
 
 import type * as pulumi from '@pulumi/pulumi'
 
+// The zone is the longest registered name of the account that the domain belongs to.
 export function zoneForDomain(
 	accountId: string,
 	domain: string,

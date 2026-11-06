@@ -7,18 +7,19 @@ import {
 	authorizeApproval,
 } from './src/authorize-approval.ts'
 import { CircleApproval } from './src/circle-approval.ts'
+import { PlatformError } from './src/domain/platform-error.ts'
+import { GITHUB_WEBHOOK } from './src/domain/service/approval-service.ts'
 import { GitHubApi } from './src/github-api.ts'
 import { GitHubApproval } from './src/github-approval.ts'
-import { GITHUB_WEBHOOK, WorkerSecrets } from './src/github-service-config.ts'
+import { WorkerSecrets } from './src/github-service-config.ts'
 import { decode } from './src/github-transport.ts'
-import { PlatformError } from './src/platform-error.ts'
-import { RecordSchema } from './src/record.ts'
 import { verifyWebhook } from './src/verify-webhook.ts'
 
 const HTTP_NOT_FOUND = 404
 const HTTP_FORBIDDEN = 403
 const HTTP_SERVICE_UNAVAILABLE = 503
 const FAILURE = 'Approval service operation failed'
+const RequestedAction = v.looseObject({ action: v.literal('requested_action') })
 
 function isHealthRequest(request: Request, url: URL): boolean {
 	return request.method === 'GET' && url.pathname === '/health'
@@ -33,8 +34,7 @@ function approvalEventOf(
 	payload: unknown,
 	secrets: WorkerSecrets,
 ): ApprovalEvent | undefined {
-	if (!v.is(RecordSchema, payload) || payload.action !== 'requested_action')
-		return undefined
+	if (!v.is(RequestedAction, payload)) return undefined
 	const parsed = v.safeParse(ApprovalEvent, payload)
 	if (!parsed.success)
 		throw new ApprovalDenied('The requested approval event is malformed')

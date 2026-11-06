@@ -1,7 +1,7 @@
 import * as v from 'valibot'
 
+import { PROJECT_NAME } from './domain/configuration/project-name.ts'
 import { PositiveId, Revision } from './github-api.ts'
-import { PROJECT_NAME } from './project-name.ts'
 
 export const APPROVAL_CHECK = 'Approve production'
 export const APPROVAL_ACTION = 'approve-production'

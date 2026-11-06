@@ -8,12 +8,16 @@
 // Progress goes to stderr; stdout receives the stack outputs as one JSON object.
 import { parseArgs } from 'node:util'
 
-import { platformStack } from './src/platform-stack.ts'
-import { program } from './src/program.ts'
-import { readSpec } from './src/spec.ts'
-import { MILLISECONDS_PER_SECOND } from './src/time.ts'
-
-import type * as automation from '@pulumi/pulumi/automation/index.js'
+import { env } from './src/adapters/cli.ts'
+import { readSpec } from './src/adapters/platform-files.ts'
+import { program } from './src/adapters/pulumi/program.ts'
+import {
+	previewStack,
+	selectStack,
+	upStack,
+} from './src/adapters/pulumi/stack.ts'
+import { r2StateBackend } from './src/adapters/pulumi/state-backend.ts'
+import { MILLISECONDS_PER_SECOND } from './src/lib/time.ts'
 
 const { values: args } = parseArgs({
 	options: {
@@ -26,44 +30,43 @@ if (!args.spec || !args.work)
 	throw new Error('usage: deploy.ts --spec <file> --work <dir> [--preview]')
 
 // Phase timings on stderr: the job's budget is measured in seconds.
-const started = Date.now()
+const started = performance.now()
 let last = started
 function lap(phase: string, since = last): void {
-	const now = Date.now()
+	const now = performance.now()
 	process.stderr.write(
 		`[${phase}: ${((now - since) / MILLISECONDS_PER_SECOND).toFixed(1)}s]\n`,
 	)
 	last = now
 }
 
+const token = env('CLOUDFLARE_API_TOKEN')
+const accountId = env('CLOUDFLARE_ACCOUNT_ID')
+const passphrase = env('PULUMI_CONFIG_PASSPHRASE')
+const bucket = env('NEXTNODE_STATE_BUCKET')
 const spec = readSpec(args.spec)
-const stack = await platformStack({
+
+const backend = await r2StateBackend({ token, accountId, bucket })
+lap('token verified')
+
+const stack = await selectStack({
 	project: spec.project,
-	environment: spec.environment,
-	work: args.work,
-	program: accountId => program(spec, accountId),
+	stackName: spec.environment,
+	program: id => program(spec, id),
+	accountId,
+	token,
+	passphrase,
+	backend,
+	workDir: args.work,
 })
 lap('stack selected')
 
-// Refreshed in the same run: what disappeared outside Pulumi, such as a domain that went
-// with a deleted Worker, leaves the state instead of failing its own deletion. One run
-// of the program, not two: each run starts a language host.
 const onOutput = (out: string): void => {
 	process.stderr.write(out)
 }
-async function converge(): Promise<automation.OutputMap> {
-	if (args.preview) {
-		await stack.preview({ onOutput, diff: true, refresh: true })
-		lap('preview')
-		return {}
-	}
-	const { outputs } = await stack.up({ onOutput, refresh: true })
-	lap('up')
-	return outputs
-}
-
-const outputs = await converge()
+const outputs = args.preview
+	? await previewStack(stack, onOutput)
+	: await upStack(stack, onOutput)
+lap(args.preview ? 'preview' : 'up')
 lap('total', started)
-process.stdout.write(
-	`${JSON.stringify(Object.fromEntries(Object.entries(outputs).map(([key, output]) => [key, output.value])))}\n`,
-)
+process.stdout.write(`${JSON.stringify(outputs)}\n`)

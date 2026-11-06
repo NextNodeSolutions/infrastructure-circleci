@@ -1,30 +1,26 @@
+// Reads what Wrangler wrote to its output file during the deployment step and prints the
+// deployment record as JSON: the uploaded version, empty when the Worker was deployed
+// directly and already serves, and the URL the smoke request targets.
+//
+//   node deployed.ts --wrangler-output <file> --domain <hostname>
 import { parseArgs } from 'node:util'
 
-import { PlatformError } from './src/platform-error.ts'
-import { readDeployment } from './src/read-deployment.ts'
+import { readUpload } from './src/adapters/wrangler/output.ts'
+import { recordDeployment } from './src/domain/deployment/upload.ts'
 
-function main(): void {
-	const { values: arguments_ } = parseArgs({
-		options: {
-			'wrangler-output': { type: 'string' },
-			domain: { type: 'string' },
-		},
-	})
-	if (!arguments_['wrangler-output'] || !arguments_.domain) {
-		throw new PlatformError(
-			'usage: deployed.ts --wrangler-output <file> --domain <hostname>',
-		)
-	}
-	process.stdout.write(
-		`${JSON.stringify(readDeployment(arguments_['wrangler-output'], arguments_.domain))}\n`,
+const { values: args } = parseArgs({
+	options: {
+		'wrangler-output': { type: 'string' },
+		domain: { type: 'string' },
+	},
+})
+if (!args['wrangler-output'] || !args.domain)
+	throw new Error(
+		'usage: deployed.ts --wrangler-output <file> --domain <hostname>',
 	)
-}
 
-try {
-	main()
-} catch (error) {
-	process.stderr.write(
-		`${PlatformError.describe(error, 'Wrangler deployment metadata could not be read')}\n`,
-	)
-	process.exitCode = 1
-}
+const record = recordDeployment(
+	readUpload(args['wrangler-output']),
+	args.domain,
+)
+process.stdout.write(`${JSON.stringify(record)}\n`)

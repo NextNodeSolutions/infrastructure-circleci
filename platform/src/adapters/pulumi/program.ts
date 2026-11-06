@@ -5,7 +5,7 @@ import * as cloudflare from '@pulumi/cloudflare'
 
 import { zoneForDomain } from './zone-for-domain.ts'
 
-import type { Spec } from './spec.ts'
+import type { Spec } from '../../domain/configuration/spec.ts'
 
 export async function program(
 	spec: Spec,
@@ -17,7 +17,7 @@ export async function program(
 	// driver runs after that upload, so the Worker exists before the domain names it.
 	// A hostname holds one custom domain and a new service replaces the resource, so the
 	// old attachment is deleted first.
-	new cloudflare.WorkersCustomDomain(
+	const domain = new cloudflare.WorkersCustomDomain(
 		'domain',
 		{
 			accountId,
@@ -28,5 +28,5 @@ export async function program(
 		{ deleteBeforeReplace: true },
 	)
 
-	return { domain: spec.domain, zone: zone.name }
+	return { domain: domain.hostname, zone: zone.name }
 }

@@ -2,14 +2,14 @@ import { parseArgs } from 'node:util'
 
 import * as v from 'valibot'
 
+import { readSpec } from './src/adapters/platform-files.ts'
 import { Release } from './src/approval-record.ts'
 import { verifyProductionApproval } from './src/authorize-approval.ts'
+import { PlatformError } from './src/domain/platform-error.ts'
 import { GitHubApi } from './src/github-api.ts'
 import { GitHubApproval } from './src/github-approval.ts'
 import { GitHubChecks } from './src/github-checks.ts'
 import { decode, ReportingError } from './src/github-transport.ts'
-import { PlatformError } from './src/platform-error.ts'
-import { readSpec } from './src/spec.ts'
 
 const CircleContext = v.object({
 	CIRCLE_BRANCH: v.literal('main'),

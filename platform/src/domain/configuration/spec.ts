@@ -1,12 +1,11 @@
 // What the read step extracted from nextnode.toml for one environment. The read step
 // writes it as JSON in the platform's directory; every later step of the job, and the
 // program, read this file and never the project's files again.
-import { readFileSync } from 'node:fs'
-
 import * as v from 'valibot'
 
+import { PlatformError } from '../platform-error.ts'
+
 import { Environment, HealthPath, Hostname } from './nextnode-toml.ts'
-import { PlatformError } from './platform-error.ts'
 import { PROJECT_NAME } from './project-name.ts'
 
 const filled = v.pipe(v.string(), v.nonEmpty('is empty'))
@@ -14,6 +13,7 @@ const filled = v.pipe(v.string(), v.nonEmpty('is empty'))
 export const Spec = v.object({
 	// The repository's name, which names the project everywhere the platform keeps state for it: the Pulumi project and the vault project.
 	project: v.pipe(v.string(), v.regex(PROJECT_NAME)),
+	// The hostname of every declared environment, which the release checks link to.
 	domains: v.record(Environment, Hostname),
 	// Environment being deployed, also the stack name.
 	environment: Environment,
@@ -30,19 +30,11 @@ export const Spec = v.object({
 })
 export type Spec = v.InferOutput<typeof Spec>
 
-export function readSpec(path: string): Spec {
-	let document: unknown
-	try {
-		document = JSON.parse(readFileSync(path, 'utf8'))
-	} catch {
-		throw new PlatformError(
-			`${path}: a readable JSON deployment spec is required. Regenerate it with the read step.`,
-		)
-	}
-	const parsed = v.safeParse(Spec, document)
+export function parseSpec(json: unknown, source: string): Spec {
+	const parsed = v.safeParse(Spec, json)
 	if (!parsed.success)
 		throw new PlatformError(
-			`${path}: invalid deployment fields: ${parsed.issues.map(issue => v.getDotPath(issue) ?? 'spec').join(', ')}. Regenerate it with the read step.`,
+			`${source}: invalid deployment fields: ${parsed.issues.map(issue => v.getDotPath(issue) ?? 'spec').join(', ')}. Regenerate it with the read step.`,
 		)
 	return parsed.output
 }

@@ -1,6 +1,6 @@
 import * as v from 'valibot'
 
-import { PlatformError } from './platform-error.ts'
+import { PlatformError } from '../../domain/platform-error.ts'
 
 // Pulumi omits the empty resource list when exporting a newly initialized stack.
 const Checkpoint = v.object({

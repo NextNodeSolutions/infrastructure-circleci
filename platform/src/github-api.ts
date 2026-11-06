@@ -2,9 +2,9 @@ import { createPrivateKey, sign } from 'node:crypto'
 
 import * as v from 'valibot'
 
+import { PROJECT_NAME } from './domain/configuration/project-name.ts'
 import { decode, ReportingError, request } from './github-transport.ts'
-import { PROJECT_NAME } from './project-name.ts'
-import { SECONDS_PER_MINUTE, MILLISECONDS_PER_SECOND } from './time.ts'
+import { SECONDS_PER_MINUTE, MILLISECONDS_PER_SECOND } from './lib/time.ts'
 
 const JWT_MINUTES = 9
 const JWT_SECONDS = JWT_MINUTES * SECONDS_PER_MINUTE

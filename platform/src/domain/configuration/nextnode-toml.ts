@@ -4,8 +4,8 @@
 // rule, and the probe job matches refusals on those words.
 import * as v from 'valibot'
 
-import { GITHUB_SERVICE } from './github-service-config.ts'
-import { RecordSchema } from './record.ts'
+import { Refusal } from '../refusal.ts'
+import { GITHUB_SERVICE } from '../service/approval-service.ts'
 
 // The deployment jobs of the pipeline. Production is deployed by every project; a
 // project without a development environment halts that job.
@@ -19,7 +19,8 @@ export type Environment = v.InferOutput<typeof Environment>
 // Valibot's object and record schemas accept an array, as an object keyed by its indexes,
 // so every table of the file goes through this check first.
 const table = v.custom<Record<string, unknown>>(
-	input => v.is(RecordSchema, input),
+	input =>
+		typeof input === 'object' && input !== null && !Array.isArray(input),
 	issue => `must be a table, got ${issue.received}`,
 )
 
@@ -130,6 +131,13 @@ const refusedKey = `is refused. The Wrangler keys the platform accepts: ${Object
 const Wrangler = strict(WRANGLER, refusedKey)
 export type Wrangler = v.InferOutput<typeof Wrangler>
 
+// The configuration the read step generates for one environment, named after its Worker.
+export const WranglerConfig = strict(
+	{ ...WRANGLER, name: v.string() },
+	refusedKey,
+)
+export type WranglerConfig = v.InferOutput<typeof WranglerConfig>
+
 export const NextnodeToml = strict(
 	{
 		...WRANGLER,
@@ -175,4 +183,12 @@ export function describe(issues: readonly v.BaseIssue<unknown>[]): string {
 				`nextnode.toml: ${v.getDotPath(issue) ?? 'the file'} ${issue.message}`,
 		)
 		.join('\n')
+}
+
+export function parseConfiguration(toml: unknown): NextnodeToml {
+	const parsed = v.safeParse(NextnodeToml, toml, {
+		message: issue => `must be ${issue.expected}, got ${issue.received}`,
+	})
+	if (!parsed.success) throw new Refusal(describe(parsed.issues))
+	return parsed.output
 }

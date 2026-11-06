@@ -1,4 +1,4 @@
-import { PlatformError } from './platform-error.ts'
+import { PlatformError } from './domain/platform-error.ts'
 
 import type {
 	Approval,

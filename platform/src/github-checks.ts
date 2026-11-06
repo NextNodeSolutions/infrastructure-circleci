@@ -3,8 +3,8 @@ import * as v from 'valibot'
 import { PAGE_SIZE, PositiveId, Pull, Revision } from './github-api.ts'
 import { decode, ReportingError } from './github-transport.ts'
 
+import type { Environment } from './domain/configuration/nextnode-toml.ts'
 import type { GitHubApi } from './github-api.ts'
-import type { Environment } from './nextnode-toml.ts'
 
 const Check = v.object({
 	id: PositiveId,
