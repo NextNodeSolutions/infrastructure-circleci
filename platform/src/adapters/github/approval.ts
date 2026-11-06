@@ -22,6 +22,7 @@ import type {
 import type { GitHubApi } from './api.ts'
 
 const Actor = v.object({ id: PositiveId, login: Login })
+const MEMBERSHIP_REQUIRED = 'Active GitHub Core membership is required'
 
 export class GitHubApproval implements ApprovalGitHub {
 	private readonly api: GitHubApi
@@ -42,7 +43,10 @@ export class GitHubApproval implements ApprovalGitHub {
 		}
 	}
 
-	async load(checkId: number): Promise<Approval> {
+	// The approval check of this App, with its record.
+	private async loadCheck(
+		checkId: number,
+	): Promise<{ check: ApprovalCheck; record: ApprovalRecord }> {
 		const parsed = v.safeParse(
 			ApprovalCheck,
 			await this.readApproval(
@@ -56,9 +60,11 @@ export class GitHubApproval implements ApprovalGitHub {
 			throw new ApprovalDenied(
 				'The approval check belongs to another GitHub App',
 			)
-		const record = this.recordOf(check.external_id)
-		if (!record)
-			throw new ApprovalDenied('The approval record is malformed')
+		return { check, record: this.requireRecord(check) }
+	}
+
+	async load(checkId: number): Promise<Approval> {
+		const { check, record } = await this.loadCheck(checkId)
 		const pull = decode(
 			Pull,
 			await this.readApproval(
@@ -74,10 +80,7 @@ export class GitHubApproval implements ApprovalGitHub {
 			throw new ApprovalDenied(
 				'No GitHub approval exists for this workflow',
 			)
-		const record = this.recordOf(matching.external_id)
-		if (!record)
-			throw new ApprovalDenied('The approval record is malformed')
-		return this.approvalOf(matching, record, pull)
+		return this.approvalOf(matching, this.requireRecord(matching), pull)
 	}
 
 	private approvalOf(
@@ -97,6 +100,7 @@ export class GitHubApproval implements ApprovalGitHub {
 		return { check, record, repository: this.api.repository }
 	}
 
+	// The record a check carries, or undefined when the check is not an approval of the platform.
 	private recordOf(encoded: string): ApprovalRecord | undefined {
 		try {
 			const parsed = v.safeParse(ApprovalRecord, JSON.parse(encoded))
@@ -105,6 +109,13 @@ export class GitHubApproval implements ApprovalGitHub {
 		} catch {
 			return undefined
 		}
+	}
+
+	private requireRecord(check: ApprovalCheck): ApprovalRecord {
+		const record = this.recordOf(check.external_id)
+		if (!record)
+			throw new ApprovalDenied('The approval record is malformed')
+		return record
 	}
 
 	private async existing(
@@ -159,19 +170,7 @@ export class GitHubApproval implements ApprovalGitHub {
 	}
 
 	async notifyFailure(checkId: number, reason: string): Promise<void> {
-		const check = decode(
-			ApprovalCheck,
-			await this.readApproval(
-				`/repos/${this.api.repository}/check-runs/${checkId}`,
-			),
-		)
-		if (check.app.id !== this.api.appId)
-			throw new ApprovalDenied(
-				'The approval check belongs to another GitHub App',
-			)
-		const record = this.recordOf(check.external_id)
-		if (!record)
-			throw new ApprovalDenied('The approval record is malformed')
+		const { check, record } = await this.loadCheck(checkId)
 		if (record.approver) return
 		await this.api.write(
 			`/repos/${this.api.repository}/check-runs/${check.id}`,
@@ -219,14 +218,9 @@ export class GitHubApproval implements ApprovalGitHub {
 				),
 			)
 			if (membership.state !== 'active')
-				throw new ApprovalDenied(
-					'Active GitHub Core membership is required',
-				)
+				throw new ApprovalDenied(MEMBERSHIP_REQUIRED)
 		} catch (error) {
-			if (isNotFound(error))
-				throw new ApprovalDenied(
-					'Active GitHub Core membership is required',
-				)
+			if (isNotFound(error)) throw new ApprovalDenied(MEMBERSHIP_REQUIRED)
 			throw error
 		}
 	}
