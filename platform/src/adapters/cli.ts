@@ -2,6 +2,8 @@ import { Refusal } from '../domain/refusal.ts'
 import { Resources } from '../domain/vault/platform-secrets.ts'
 import { decodeOr } from '../lib/decode.ts'
 
+import type { PlatformCredentials } from './pulumi/stack.ts'
+
 // Runs a step program: a refusal prints its message alone and exits 1, any other error
 // stays a crash with its stack.
 export function refusing<T>(step: () => T): T {
@@ -18,13 +20,6 @@ export function env(name: string): string {
 	const setting = process.env[name]
 	if (!setting) throw new Error(`${name} is not set`)
 	return setting
-}
-
-export type PlatformCredentials = {
-	token: string
-	accountId: string
-	passphrase: string
-	bucket: string
 }
 
 // What a job exports from the vault's resources scope, and the state bucket it names.

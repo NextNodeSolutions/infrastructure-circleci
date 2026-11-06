@@ -4,7 +4,14 @@ import * as automation from '@pulumi/pulumi/automation/index.js'
 
 import { r2StateBackend } from './state-backend.ts'
 
-import type { PlatformCredentials } from '../cli.ts'
+// The platform's Cloudflare token and account, the state's passphrase and bucket: what a
+// job exports from the vault's resources scope.
+export type PlatformCredentials = {
+	token: string
+	accountId: string
+	passphrase: string
+	bucket: string
+}
 
 export type Program = (accountId: string) => Promise<Record<string, unknown>>
 
