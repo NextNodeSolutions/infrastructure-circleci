@@ -2,7 +2,9 @@ import { mkdirSync } from 'node:fs'
 
 import * as automation from '@pulumi/pulumi/automation/index.js'
 
-import type { StateBackend } from './state-backend.ts'
+import { r2StateBackend } from './state-backend.ts'
+
+import type { PlatformCredentials } from '../cli.ts'
 
 export type Program = (accountId: string) => Promise<Record<string, unknown>>
 
@@ -10,15 +12,16 @@ export type StackSettings = {
 	project: string
 	stackName: string
 	program: Program
-	accountId: string
-	token: string
-	passphrase: string
-	backend: StateBackend
 	workDir: string
 }
 
 type Outputs = Record<string, unknown>
 export type OnOutput = (out: string) => void
+
+// Pulumi's progress, on stderr: stdout is for the outputs the step prints.
+export const toStderr: OnOutput = out => {
+	process.stderr.write(out)
+}
 
 function values(outputs: automation.OutputMap): Outputs {
 	return Object.fromEntries(
@@ -27,13 +30,15 @@ function values(outputs: automation.OutputMap): Outputs {
 }
 
 // The stack of one environment, in the Pulumi project named after the repository for an
-// application and after the platform for a shared service.
-export async function selectStack(
+// application and after the platform for a shared service, on the state bucket every stack
+// shares, with the platform's credentials.
+export async function openStack(
 	settings: StackSettings,
+	credentials: PlatformCredentials,
 ): Promise<automation.Stack> {
-	const { project, stackName, program, accountId, token, passphrase } =
-		settings
-	const { backend, workDir } = settings
+	const { project, stackName, program, workDir } = settings
+	const { token, accountId, passphrase, bucket } = credentials
+	const backend = await r2StateBackend({ token, accountId, bucket })
 	mkdirSync(workDir, { recursive: true, mode: 0o700 })
 	return automation.LocalWorkspace.createOrSelectStack(
 		{ stackName, projectName: project, program: () => program(accountId) },

@@ -8,15 +8,15 @@
 // Progress goes to stderr; stdout receives the stack outputs as one JSON object.
 import { parseArgs } from 'node:util'
 
-import { env } from './src/adapters/cli.ts'
+import { platformCredentials } from './src/adapters/cli.ts'
 import { readSpec } from './src/adapters/platform-files.ts'
 import { program } from './src/adapters/pulumi/program.ts'
 import {
+	openStack,
 	previewStack,
-	selectStack,
+	toStderr,
 	upStack,
 } from './src/adapters/pulumi/stack.ts'
-import { r2StateBackend } from './src/adapters/pulumi/state-backend.ts'
 import { MILLISECONDS_PER_SECOND } from './src/lib/time.ts'
 
 const { values: args } = parseArgs({
@@ -40,33 +40,21 @@ function lap(phase: string, since = last): void {
 	last = now
 }
 
-const token = env('CLOUDFLARE_API_TOKEN')
-const accountId = env('CLOUDFLARE_ACCOUNT_ID')
-const passphrase = env('PULUMI_CONFIG_PASSPHRASE')
-const bucket = env('NEXTNODE_STATE_BUCKET')
 const spec = readSpec(args.spec)
-
-const backend = await r2StateBackend({ token, accountId, bucket })
-lap('token verified')
-
-const stack = await selectStack({
-	project: spec.project,
-	stackName: spec.environment,
-	program: id => program(spec, id),
-	accountId,
-	token,
-	passphrase,
-	backend,
-	workDir: args.work,
-})
+const stack = await openStack(
+	{
+		project: spec.project,
+		stackName: spec.environment,
+		program: id => program(spec, id),
+		workDir: args.work,
+	},
+	platformCredentials(),
+)
 lap('stack selected')
 
-const onOutput = (out: string): void => {
-	process.stderr.write(out)
-}
 const outputs = args.preview
-	? await previewStack(stack, onOutput)
-	: await upStack(stack, onOutput)
+	? await previewStack(stack, toStderr)
+	: await upStack(stack, toStderr)
 lap(args.preview ? 'preview' : 'up')
 lap('total', started)
 process.stdout.write(`${JSON.stringify(outputs)}\n`)

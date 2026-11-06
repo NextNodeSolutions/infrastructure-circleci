@@ -8,13 +8,12 @@ import { parseArgs } from 'node:util'
 import * as cloudflare from '@pulumi/cloudflare'
 
 import { CircleApproval } from './src/adapters/circleci/approval.ts'
-import { env } from './src/adapters/cli.ts'
+import { platformCredentials } from './src/adapters/cli.ts'
 import { GitHubApi } from './src/adapters/github/api.ts'
 import { decode } from './src/adapters/github/transport.ts'
 import { REQUEST_TIMEOUT_MS } from './src/adapters/http.ts'
 import { stackHasResource } from './src/adapters/pulumi/checkpoint.ts'
-import { selectStack } from './src/adapters/pulumi/stack.ts'
-import { r2StateBackend } from './src/adapters/pulumi/state-backend.ts'
+import { openStack, toStderr } from './src/adapters/pulumi/stack.ts'
 import { zoneForDomain } from './src/adapters/pulumi/zone-for-domain.ts'
 import { readUpload } from './src/adapters/wrangler/output.ts'
 import {
@@ -201,25 +200,17 @@ function assertServiceRun(): void {
 	}
 }
 
-// The service's own stack, in the platform's project, on the state bucket every stack shares.
-async function serviceStack(workDir: string): Promise<automation.Stack> {
-	const token = env('CLOUDFLARE_API_TOKEN')
-	const accountId = env('CLOUDFLARE_ACCOUNT_ID')
-	const backend = await r2StateBackend({
-		token,
-		accountId,
-		bucket: env('NEXTNODE_STATE_BUCKET'),
-	})
-	return selectStack({
-		project: `platform.${GITHUB_SERVICE.worker.name}`,
-		stackName: 'production',
-		program: resources,
-		accountId,
-		token,
-		passphrase: env('PULUMI_CONFIG_PASSPHRASE'),
-		backend,
-		workDir,
-	})
+// The service's own stack, in the platform's project.
+function serviceStack(workDir: string): Promise<automation.Stack> {
+	return openStack(
+		{
+			project: `platform.${GITHUB_SERVICE.worker.name}`,
+			stackName: 'production',
+			program: resources,
+			workDir,
+		},
+		platformCredentials(),
+	)
 }
 
 async function main(): Promise<void> {
@@ -234,9 +225,6 @@ async function main(): Promise<void> {
 	const directory = resolve(values.work)
 	mkdirSync(directory, { recursive: true, mode: 0o700 })
 	const stack = await serviceStack(join(directory, 'pulumi'))
-	const onOutput = (output: string): void => {
-		process.stderr.write(output)
-	}
 	const secrets = decode(
 		WorkerSecrets,
 		JSON.parse(readFileSync(resolve(values.bindings), 'utf8')),
@@ -244,10 +232,10 @@ async function main(): Promise<void> {
 	await GitHubApi.verifyAccess(secrets)
 	await new CircleApproval(secrets.CIRCLECI_TOKEN).verifyAccess()
 	// A domain deleted with its Worker leaves the state here, so the run deploys afresh.
-	await stack.refresh({ onOutput })
+	await stack.refresh({ onOutput: toStderr })
 	const hasDomain = await stackHasResource(stack, DOMAIN_RESOURCE)
 	await publishVersion(directory, secrets, hasDomain ? 'update' : 'create')
-	await stack.up({ onOutput })
+	await stack.up({ onOutput: toStderr })
 	await awaitHealth(secrets, new URL(GITHUB_HEALTH.origin))
 	await GitHubApi.configureWebhook(
 		secrets,
