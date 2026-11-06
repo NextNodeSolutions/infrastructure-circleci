@@ -1,5 +1,6 @@
 import { PlatformError } from '../../domain/platform-error.ts'
 import { decodeOr } from '../../lib/decode.ts'
+import { HTTP_NOT_FOUND, HTTP_SERVER_ERROR } from '../../lib/http-status.ts'
 import { requestJson } from '../http.ts'
 
 import type * as v from 'valibot'
@@ -9,8 +10,6 @@ const API = 'https://api.github.com'
 const API_VERSION = '2022-11-28'
 const READ_ATTEMPTS = 3
 const RETRY_DELAY_MS = 1_000
-const HTTP_SERVER_ERROR = 500
-const HTTP_NOT_FOUND = 404
 export class ReportingError extends PlatformError {
 	readonly status: number | undefined
 	constructor(message: string, status?: number) {

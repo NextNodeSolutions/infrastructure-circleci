@@ -11,9 +11,11 @@ import { ApprovalEvent } from './src/domain/approval/record.ts'
 import { GITHUB_HEALTH, GITHUB_WEBHOOK } from './src/domain/approval/service.ts'
 import { PlatformError } from './src/domain/platform-error.ts'
 import { WorkerSecrets } from './src/domain/vault/platform-secrets.ts'
+import {
+	HTTP_NOT_FOUND,
+	HTTP_SERVICE_UNAVAILABLE,
+} from './src/lib/http-status.ts'
 
-const HTTP_NOT_FOUND = 404
-const HTTP_SERVICE_UNAVAILABLE = 503
 const FAILURE = 'Approval service operation failed'
 const RequestedAction = v.looseObject({ action: ApprovalEvent.entries.action })
 
