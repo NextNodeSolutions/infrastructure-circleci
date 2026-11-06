@@ -1,26 +1,18 @@
 // Finds the vault project named after the repository among the projects the job's
-// identity belongs to, and prints its id. The identity is a member of every application
-// project, so the name is what keeps a project away from another's secrets. The vault
-// token comes from the environment, never from an argument.
+// identity belongs to, and prints its id. The vault token comes from the environment,
+// never from an argument.
 //
-//   INFISICAL_TOKEN=... node vault-project.ts --name <repository>
-import { parseArgs } from "node:util";
-import { isRecord } from "./src/record.ts";
+//   INFISICAL_DOMAIN=... INFISICAL_TOKEN=... node vault-project.ts --name <repository>
+import { parseArgs } from 'node:util'
 
-const { values: args } = parseArgs({ options: { name: { type: "string" } } });
-if (!args.name) throw new Error("usage: vault-project.ts --name <repository>");
-const token = process.env.INFISICAL_TOKEN;
-if (!token) throw new Error("INFISICAL_TOKEN is not set");
+import { env } from './src/adapters/cli.ts'
+import { listVaultProjects } from './src/adapters/infisical/projects.ts'
+import { findVaultProject } from './src/domain/vault/project.ts'
 
-const domain = process.env.INFISICAL_DOMAIN;
-if (!domain) throw new Error("INFISICAL_DOMAIN is not set");
-const response = await fetch(`${domain}/v1/workspace`, { headers: { authorization: `Bearer ${token}` }, redirect: "error" });
-if (!response.ok) throw new Error(`the vault refused the project listing (HTTP ${response.status})`);
-const body: unknown = await response.json();
-const projects = isRecord(body) && Array.isArray(body.workspaces) ? body.workspaces.filter(isRecord) : [];
-const named = projects.filter((project) => project.name === args.name && project.type === "secret-manager");
-const id = named[0]?.id;
-if (named.length !== 1 || typeof id !== "string") {
-  throw new Error(`the identity belongs to ${named.length} vault project(s) named ${args.name}: expected exactly one, named after the repository`);
-}
-process.stdout.write(id);
+const { values: args } = parseArgs({ options: { name: { type: 'string' } } })
+if (!args.name) throw new Error('usage: vault-project.ts --name <repository>')
+const token = env('INFISICAL_TOKEN')
+const domain = env('INFISICAL_DOMAIN')
+
+const projects = await listVaultProjects(domain, token)
+process.stdout.write(findVaultProject(projects, args.name))

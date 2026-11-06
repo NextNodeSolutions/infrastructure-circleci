@@ -1,16 +1,15 @@
 {
   "name": "@nextnode-solutions/platform",
   "version": "0.0.0",
-  "private": true,
   "description": "The Pulumi program of the NextNode platform, the driver the deployment job runs through the Automation API, and the small programs of its read and deployment steps.",
-  "type": "module",
-  "engines": {
-    "node": ">=24"
-  },
-  "packageManager": "pnpm@10.11.0+sha512.6540583f41cc5f628eb3d9773ecee802f4f9ef9923cc45b69890fb47991d4b092964694ec3a4f738a420c918a333062c8b925d312f42e4f0c263eb603551f977",
   "scripts": {
-    "check": "tsc --noEmit",
-    "deploy": "node deploy.ts"
+    "check": "pnpm type-check",
+    "deploy": "node deploy.ts",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
+    "lint": "oxlint",
+    "prepare": "node .husky/install.mjs",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@infisical/cli": "0.44.9",
@@ -21,9 +20,23 @@
     "wrangler": "4.152.0"
   },
   "devDependencies": {
+    "@commitlint/cli": "19.8.1",
+    "@commitlint/config-conventional": "19.8.1",
+    "@nextnode-solutions/standards": "1.27.1",
     "@types/node": "24.9.1",
+    "better-sort-package-json": "1.1.1",
+    "husky": "9.1.7",
+    "lint-staged": "17.6.0",
+    "oxfmt": "0.75.0",
+    "oxlint": "1.90.0",
     "typescript": "6.0.3"
   },
+  "engines": {
+    "node": ">=24"
+  },
+  "private": true,
+  "packageManager": "pnpm@10.11.0+sha512.6540583f41cc5f628eb3d9773ecee802f4f9ef9923cc45b69890fb47991d4b092964694ec3a4f738a420c918a333062c8b925d312f42e4f0c263eb603551f977",
+  "type": "module",
   "pnpm": {
     "onlyBuiltDependencies": [
       "@infisical/cli",

@@ -1,18 +1,9 @@
 // Turns the vault's JSON export, read on stdin, into shell exports on stdout, one per
 // secret, each value a single-quoted literal. The names go to stderr for the job log;
 // the values never do.
-import { text } from "node:stream/consumers";
-import { isRecord } from "./src/record.ts";
+import { text } from 'node:stream/consumers'
 
-const SHELL_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+import { secretsOf } from './src/adapters/infisical/export.ts'
+import { emitExports } from './src/adapters/shell/exports.ts'
 
-const exported: unknown = JSON.parse(await text(process.stdin));
-if (!Array.isArray(exported)) throw new Error("the vault export is not a JSON array");
-const secrets = exported.map((entry: unknown) => {
-  if (!isRecord(entry) || typeof entry.key !== "string" || typeof entry.value !== "string") throw new Error("the vault export holds an entry without a key and a value");
-  if (!SHELL_NAME.test(entry.key)) throw new Error(`secret name ${JSON.stringify(entry.key)} is not a shell variable name`);
-  return { key: entry.key, value: entry.value };
-});
-const literal = (value: string): string => `'${value.replace(/'/g, `'\\''`)}'`;
-process.stdout.write(secrets.map(({ key, value }) => `export ${key}=${literal(value)}\n`).join(""));
-console.error(`${secrets.length} secret(s): ${secrets.map(({ key }) => key).join(", ")}`);
+emitExports(secretsOf(await text(process.stdin)))

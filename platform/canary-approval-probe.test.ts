@@ -1,12 +1,16 @@
-import assert from "node:assert/strict";
-import { spawnSync, type SpawnSyncReturns } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { delimiter, join } from "node:path";
-import test, { type TestContext } from "node:test";
-import { APPROVAL_PROBE as probe } from "./approval-probe-fixtures.ts";
+import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { delimiter, join } from 'node:path'
+import test from 'node:test'
 
-const TIMEOUT_MS = 30_000;
+import { APPROVAL_PROBE as probe } from './approval-probe-fixtures.ts'
+
+import type { SpawnSyncReturns } from 'node:child_process'
+import type { TestContext } from 'node:test'
+
+const TIMEOUT_MS = 30_000
 const FAKE_CURL = `#!${process.execPath}
 const fs = require("node:fs");
 const args = process.argv.slice(2);
@@ -45,49 +49,75 @@ if (url.hostname === "probe-output.invalid") {
   throw new Error("Unexpected canary request " + url.pathname);
 }
 process.stdout.write(JSON.stringify(response));
-`;
+`
 
-type Outcome = "refused" | "unrelated" | "exported" | "approved" | "production_failed";
+type Outcome =
+	| 'refused'
+	| 'unrelated'
+	| 'exported'
+	| 'approved'
+	| 'production_failed'
 
-function runCanary(context: TestContext, outcome: Outcome): SpawnSyncReturns<string> {
-  const root = mkdtempSync(join(tmpdir(), "nextnode-canary-probe-"));
-  context.after(() => rmSync(root, { recursive: true, force: true }));
-  writeFileSync(join(root, "curl"), FAKE_CURL, { mode: 0o700 });
-  writeFileSync(join(root, "sleep"), '#!/bin/sh\n: >"$PROBE_APPROVED"\n', { mode: 0o700 });
-  const isProduction = outcome === "approved" || outcome === "production_failed";
-  return spawnSync("/bin/bash", [join(import.meta.dirname, "../scripts/run-canary.sh"), "feature-under-review"], {
-    encoding: "utf8", timeout: TIMEOUT_MS,
-    env: {
-      PATH: [root, process.env.PATH ?? ""].join(delimiter), HOME: root, LOGS: join(root, "logs"),
-      CIRCLECI_TOKEN: "probe-only-circle-token", ...(isProduction ? { WAIT_PRODUCTION: "1" } : { APPROVE: "1" }),
-      PROBE_APPROVED: join(root, "approved"), PROBE_RESPONSE: outcome,
-    },
-  });
+function runCanary(
+	context: TestContext,
+	outcome: Outcome,
+): SpawnSyncReturns<string> {
+	const root = mkdtempSync(join(tmpdir(), 'nextnode-canary-probe-'))
+	context.after(() => rmSync(root, { recursive: true, force: true }))
+	writeFileSync(join(root, 'curl'), FAKE_CURL, { mode: 0o700 })
+	writeFileSync(join(root, 'sleep'), '#!/bin/sh\n: >"$PROBE_APPROVED"\n', {
+		mode: 0o700,
+	})
+	const isProduction =
+		outcome === 'approved' || outcome === 'production_failed'
+	return spawnSync(
+		'/bin/bash',
+		[
+			join(import.meta.dirname, '../scripts/run-canary.sh'),
+			'feature-under-review',
+		],
+		{
+			encoding: 'utf8',
+			timeout: TIMEOUT_MS,
+			env: {
+				PATH: [root, process.env.PATH ?? ''].join(delimiter),
+				HOME: root,
+				LOGS: join(root, 'logs'),
+				CIRCLECI_TOKEN: 'probe-only-circle-token',
+				...(isProduction ? { WAIT_PRODUCTION: '1' } : { APPROVE: '1' }),
+				PROBE_APPROVED: join(root, 'approved'),
+				PROBE_RESPONSE: outcome,
+			},
+		},
+	)
 }
 
 test("the direct-approval canary passes only for the production guard's refusal", context => {
-  const result = runCanary(context, "refused");
-  assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /PASS: direct CircleCI approval was refused before application production secrets/);
-});
+	const result = runCanary(context, 'refused')
+	assert.equal(result.status, 0, result.stderr)
+	assert.match(
+		result.stdout,
+		/PASS: direct CircleCI approval was refused before application production secrets/,
+	)
+})
 
-test("the production canary waits for GitHub approval and requires deployment success", context => {
-  const result = runCanary(context, "approved");
-  assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /workflow: success/);
-  assert.doesNotMatch(result.stdout, /Attempted direct CircleCI approval/);
-});
+test('the production canary waits for GitHub approval and requires deployment success', context => {
+	const result = runCanary(context, 'approved')
+	assert.equal(result.status, 0, result.stderr)
+	assert.match(result.stdout, /workflow: success/)
+	assert.doesNotMatch(result.stdout, /Attempted direct CircleCI approval/)
+})
 
-test("the production canary rejects a deployment failure after GitHub approval", context => {
-  const result = runCanary(context, "production_failed");
-  assert.equal(result.status, 1, result.stderr);
-  assert.match(result.stdout, /workflow: failed/);
-});
+test('the production canary rejects a deployment failure after GitHub approval', context => {
+	const result = runCanary(context, 'production_failed')
+	assert.equal(result.status, 1, result.stderr)
+	assert.match(result.stdout, /workflow: failed/)
+})
 
-for (const outcome of ["unrelated", "exported"] satisfies Outcome[]) {
-  test(`the direct-approval canary rejects ${outcome} failure evidence`, context => {
-    const result = runCanary(context, outcome);
-    assert.equal(result.status, 1);
-    assert.match(result.stdout, /FAIL: direct approval was not refused/);
-  });
+for (const outcome of ['unrelated', 'exported'] satisfies Outcome[]) {
+	test(`the direct-approval canary rejects ${outcome} failure evidence`, context => {
+		const result = runCanary(context, outcome)
+		assert.equal(result.status, 1)
+		assert.match(result.stdout, /FAIL: direct approval was not refused/)
+	})
 }

@@ -1,0 +1,2 @@
+cd platform
+pnpm exec lint-staged

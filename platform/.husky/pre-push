@@ -1,0 +1,2 @@
+cd platform
+pnpm lint && pnpm format:check && pnpm type-check
