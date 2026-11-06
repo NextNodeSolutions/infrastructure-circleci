@@ -15,7 +15,7 @@ import { WorkerSecrets } from './src/domain/vault/platform-secrets.ts'
 const HTTP_NOT_FOUND = 404
 const HTTP_SERVICE_UNAVAILABLE = 503
 const FAILURE = 'Approval service operation failed'
-const RequestedAction = v.looseObject({ action: v.literal('requested_action') })
+const RequestedAction = v.looseObject({ action: ApprovalEvent.entries.action })
 
 function isHealthRequest(request: Request, url: URL): boolean {
 	return request.method === 'GET' && url.pathname === GITHUB_HEALTH.pathname
