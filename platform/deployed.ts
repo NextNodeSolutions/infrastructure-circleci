@@ -5,8 +5,10 @@
 //   node deployed.ts --wrangler-output <file> --domain <hostname>
 import { parseArgs } from 'node:util'
 
+import { refusing } from './src/adapters/cli.ts'
 import { readUpload } from './src/adapters/wrangler/output.ts'
 import { recordDeployment } from './src/domain/deployment/upload.ts'
+import { Refusal } from './src/domain/refusal.ts'
 
 const { values: args } = parseArgs({
 	options: {
@@ -14,13 +16,11 @@ const { values: args } = parseArgs({
 		domain: { type: 'string' },
 	},
 })
-if (!args['wrangler-output'] || !args.domain)
-	throw new Error(
-		'usage: deployed.ts --wrangler-output <file> --domain <hostname>',
-	)
-
-const record = recordDeployment(
-	readUpload(args['wrangler-output']),
-	args.domain,
-)
+const record = refusing(() => {
+	if (!args['wrangler-output'] || !args.domain)
+		throw new Refusal(
+			'usage: deployed.ts --wrangler-output <file> --domain <hostname>',
+		)
+	return recordDeployment(readUpload(args['wrangler-output']), args.domain)
+})
 process.stdout.write(`${JSON.stringify(record)}\n`)
