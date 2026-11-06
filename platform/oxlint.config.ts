@@ -14,6 +14,32 @@ const INNER_GLOBALS = [
 ]
 const PURE_IMPORTS = ['**', '!valibot', '!node:path', '!./**', '!../**']
 
+type Override = NonNullable<
+	Parameters<typeof defineConfig>[0]['overrides']
+>[number]
+
+// An inner layer: pure, and allowed to import only what the group leaves open.
+function innerLayer(
+	files: string,
+	forbidden: string[],
+	message: string,
+): Override {
+	return {
+		files: [files],
+		rules: {
+			'no-restricted-globals': ['error', ...INNER_GLOBALS],
+			'no-restricted-imports': [
+				'error',
+				{
+					patterns: [
+						{ group: [...PURE_IMPORTS, ...forbidden], message },
+					],
+				},
+			],
+		},
+	}
+}
+
 export default defineConfig({
 	extends: [standardsConfig],
 	overrides: [
@@ -22,69 +48,21 @@ export default defineConfig({
 			files: ['github-worker.ts'],
 			rules: { 'import/no-default-export': 'off' },
 		},
-		{
-			files: ['src/domain/**'],
-			rules: {
-				'no-restricted-globals': ['error', ...INNER_GLOBALS],
-				'no-restricted-imports': [
-					'error',
-					{
-						patterns: [
-							{
-								group: [
-									...PURE_IMPORTS,
-									'**/application/**',
-									'**/adapters/**',
-								],
-								message:
-									'the domain depends on nothing but itself, the lib, valibot and node:path',
-							},
-						],
-					},
-				],
-			},
-		},
-		{
-			files: ['src/application/**'],
-			rules: {
-				'no-restricted-globals': ['error', ...INNER_GLOBALS],
-				'no-restricted-imports': [
-					'error',
-					{
-						patterns: [
-							{
-								group: [...PURE_IMPORTS, '**/adapters/**'],
-								message:
-									'the application reaches IO through its ports, never an adapter',
-							},
-						],
-					},
-				],
-			},
-		},
-		{
-			files: ['src/lib/**'],
-			rules: {
-				'no-restricted-globals': ['error', ...INNER_GLOBALS],
-				'no-restricted-imports': [
-					'error',
-					{
-						patterns: [
-							{
-								group: [
-									...PURE_IMPORTS,
-									'**/domain/**',
-									'**/application/**',
-									'**/adapters/**',
-								],
-								message:
-									'the lib knows nothing of the platform: it imports no layer, only valibot and node:path',
-							},
-						],
-					},
-				],
-			},
-		},
+		innerLayer(
+			'src/domain/**',
+			['**/application/**', '**/adapters/**'],
+			'the domain depends on nothing but itself, the lib, valibot and node:path',
+		),
+		innerLayer(
+			'src/application/**',
+			['**/adapters/**'],
+			'the application reaches IO through its ports, never an adapter',
+		),
+		innerLayer(
+			'src/lib/**',
+			['**/domain/**', '**/application/**', '**/adapters/**'],
+			'the lib knows nothing of the platform: it imports no layer, only valibot and node:path',
+		),
 		{
 			files: ['src/adapters/**'],
 			rules: {
