@@ -35,14 +35,12 @@ export async function githubProbeApi(
 				})
 			}
 			if (
-				!(
-					url.pathname ===
-					`/app/installations/${probe.event.installation.id}/access_tokens`
-				)
+				url.pathname ===
+				`/app/installations/${probe.event.installation.id}/access_tokens`
 			) {
-				return reply(url, request)
+				return Response.json({ token: 'probe-only-installation-token' })
 			}
-			return Response.json({ token: 'probe-only-installation-token' })
+			return reply(url, request)
 		},
 	)
 	return GitHubApi.connect(
