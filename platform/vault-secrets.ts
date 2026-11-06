@@ -4,7 +4,7 @@ import { parseArgs } from 'node:util'
 
 import * as v from 'valibot'
 
-import { PlatformSecrets } from './src/platform-secrets.ts'
+import { PlatformSecrets } from './src/domain/vault/platform-secrets.ts'
 
 class VaultExportError extends Error {}
 

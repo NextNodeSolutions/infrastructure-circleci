@@ -1,7 +1,7 @@
 import { generateKeyPairSync } from 'node:crypto'
 
 import { APPROVAL_PROBE as probe } from './approval-probe-fixtures.ts'
-import { GitHubApi } from './src/github-api.ts'
+import { GitHubApi } from './src/adapters/github/api.ts'
 
 import type { TestContext } from 'node:test'
 

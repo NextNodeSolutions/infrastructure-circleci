@@ -1,10 +1,12 @@
 import * as v from 'valibot'
 
-import { PAGE_SIZE, PositiveId, Pull, Revision } from './github-api.ts'
-import { decode, ReportingError } from './github-transport.ts'
+import { PositiveId, Revision } from '../../domain/approval/record.ts'
 
-import type { Environment } from './domain/configuration/nextnode-toml.ts'
-import type { GitHubApi } from './github-api.ts'
+import { PAGE_SIZE, Pull } from './api.ts'
+import { decode, ReportingError } from './transport.ts'
+
+import type { Environment } from '../../domain/configuration/nextnode-toml.ts'
+import type { GitHubApi } from './api.ts'
 
 const Check = v.object({
 	id: PositiveId,

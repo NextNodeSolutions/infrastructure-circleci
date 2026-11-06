@@ -1,4 +1,4 @@
-import { PlatformError } from './domain/platform-error.ts'
+import { ApprovalDenied } from './errors.ts'
 
 import type {
 	Approval,
@@ -6,15 +6,7 @@ import type {
 	ApprovalEvent,
 	ApprovalGitHub,
 	Release,
-} from './approval-record.ts'
-
-export class ApprovalDenied extends PlatformError {
-	readonly status = 403
-}
-
-export class ApprovalUnavailable extends PlatformError {
-	readonly status = 503
-}
+} from './record.ts'
 
 export async function authorizeApproval(
 	event: ApprovalEvent,

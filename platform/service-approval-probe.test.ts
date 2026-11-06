@@ -5,11 +5,11 @@ import test from 'node:test'
 import * as v from 'valibot'
 
 import { APPROVAL_PROBE as probe } from './approval-probe-fixtures.ts'
+import { CircleApproval } from './src/adapters/circleci/approval.ts'
+import { GitHubApi } from './src/adapters/github/api.ts'
+import { ReportingError } from './src/adapters/github/transport.ts'
 import { stackHasResource } from './src/adapters/pulumi/checkpoint.ts'
-import { ApprovalUnavailable } from './src/authorize-approval.ts'
-import { CircleApproval } from './src/circle-approval.ts'
-import { GitHubApi } from './src/github-api.ts'
-import { ReportingError } from './src/github-transport.ts'
+import { ApprovalUnavailable } from './src/domain/approval/errors.ts'
 
 import type { TestContext } from 'node:test'
 

@@ -1,6 +1,10 @@
-import { APPROVAL_ACTION } from './src/approval-record.ts'
+import { APPROVAL_ACTION } from './src/domain/approval/record.ts'
 
-import type { Actor, ApprovalEvent, Release } from './src/approval-record.ts'
+import type {
+	Actor,
+	ApprovalEvent,
+	Release,
+} from './src/domain/approval/record.ts'
 
 const owner = 'NextNodeSolutions'
 const repositoryName = 'canary'

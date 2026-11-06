@@ -7,22 +7,22 @@ import { parseArgs } from 'node:util'
 
 import * as cloudflare from '@pulumi/cloudflare'
 
+import { CircleApproval } from './src/adapters/circleci/approval.ts'
 import { env } from './src/adapters/cli.ts'
+import { GitHubApi } from './src/adapters/github/api.ts'
+import { decode } from './src/adapters/github/transport.ts'
 import { stackHasResource } from './src/adapters/pulumi/checkpoint.ts'
 import { selectStack } from './src/adapters/pulumi/stack.ts'
 import { r2StateBackend } from './src/adapters/pulumi/state-backend.ts'
 import { zoneForDomain } from './src/adapters/pulumi/zone-for-domain.ts'
 import { readUpload } from './src/adapters/wrangler/output.ts'
-import { CircleApproval } from './src/circle-approval.ts'
-import { recordDeployment } from './src/domain/deployment/upload.ts'
-import { PlatformError } from './src/domain/platform-error.ts'
 import {
 	GITHUB_SERVICE,
 	GITHUB_WEBHOOK,
-} from './src/domain/service/approval-service.ts'
-import { GitHubApi } from './src/github-api.ts'
-import { WorkerSecrets } from './src/github-service-config.ts'
-import { decode } from './src/github-transport.ts'
+} from './src/domain/approval/service.ts'
+import { recordDeployment } from './src/domain/deployment/upload.ts'
+import { PlatformError } from './src/domain/platform-error.ts'
+import { WorkerSecrets } from './src/domain/vault/platform-secrets.ts'
 import { MILLISECONDS_PER_SECOND, SECONDS_PER_MINUTE } from './src/lib/time.ts'
 
 import type * as automation from '@pulumi/pulumi/automation/index.js'

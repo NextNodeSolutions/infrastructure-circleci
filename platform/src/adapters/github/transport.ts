@@ -1,6 +1,6 @@
 import * as v from 'valibot'
 
-import { PlatformError } from './domain/platform-error.ts'
+import { PlatformError } from '../../domain/platform-error.ts'
 
 const API = 'https://api.github.com'
 // Release verification needs merge_commit_sha, removed in REST 2026-03-10.

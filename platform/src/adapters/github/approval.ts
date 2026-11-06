@@ -1,28 +1,27 @@
 import * as v from 'valibot'
 
+import { ApprovalDenied } from '../../domain/approval/errors.ts'
 import {
 	APPROVAL_ACTION,
 	APPROVAL_CHECK,
 	APPROVERS_TEAM,
 	ApprovalCheck,
 	ApprovalRecord,
-} from './approval-record.ts'
-import { ApprovalDenied } from './authorize-approval.ts'
-import { PositiveId, Pull } from './github-api.ts'
-import { decode, isNotFound } from './github-transport.ts'
+	PositiveId,
+} from '../../domain/approval/record.ts'
+
+import { Login, Pull } from './api.ts'
+import { decode, isNotFound } from './transport.ts'
 
 import type {
 	Actor,
 	Approval,
 	ApprovalGitHub,
 	Release,
-} from './approval-record.ts'
-import type { GitHubApi } from './github-api.ts'
+} from '../../domain/approval/record.ts'
+import type { GitHubApi } from './api.ts'
 
-const Actor = v.object({
-	id: PositiveId,
-	login: v.pipe(v.string(), v.regex(/^[A-Za-z0-9-]+$/)),
-})
+const Actor = v.object({ id: PositiveId, login: Login })
 
 export class GitHubApproval implements ApprovalGitHub {
 	private readonly api: GitHubApi

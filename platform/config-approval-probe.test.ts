@@ -11,17 +11,17 @@ import * as v from 'valibot'
 import { APPROVAL_PROBE as probe } from './approval-probe-fixtures.ts'
 import { githubProbeApi } from './github-probe-api.ts'
 import worker from './github-worker.ts'
-import { ApprovalDenied } from './src/authorize-approval.ts'
+import { GitHubApi } from './src/adapters/github/api.ts'
+import { GitHubApproval } from './src/adapters/github/approval.ts'
+import { ApprovalDenied } from './src/domain/approval/errors.ts'
+import {
+	GITHUB_SERVICE,
+	GITHUB_WEBHOOK,
+} from './src/domain/approval/service.ts'
 import {
 	describe,
 	NextnodeToml,
 } from './src/domain/configuration/nextnode-toml.ts'
-import {
-	GITHUB_SERVICE,
-	GITHUB_WEBHOOK,
-} from './src/domain/service/approval-service.ts'
-import { GitHubApi } from './src/github-api.ts'
-import { GitHubApproval } from './src/github-approval.ts'
 
 const WEBHOOK_KEY = probe.webhookKey
 const SOURCE_MARKER = 'probe-only-private-source-marker'

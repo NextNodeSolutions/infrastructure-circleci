@@ -1,13 +1,16 @@
 import * as v from 'valibot'
 
-import { ApprovalDenied, ApprovalUnavailable } from './authorize-approval.ts'
-import { Revision } from './github-api.ts'
+import {
+	ApprovalDenied,
+	ApprovalUnavailable,
+} from '../../domain/approval/errors.ts'
+import { Revision } from '../../domain/approval/record.ts'
 
 import type {
 	ApprovalCircleCI,
 	ApprovalRecord,
 	Release,
-} from './approval-record.ts'
+} from '../../domain/approval/record.ts'
 
 const API = 'https://circleci.com/api/v2'
 const TIMEOUT_MS = 15_000

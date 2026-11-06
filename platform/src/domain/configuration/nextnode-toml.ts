@@ -4,8 +4,8 @@
 // rule, and the probe job matches refusals on those words.
 import * as v from 'valibot'
 
+import { GITHUB_SERVICE } from '../approval/service.ts'
 import { Refusal } from '../refusal.ts'
-import { GITHUB_SERVICE } from '../service/approval-service.ts'
 
 // The deployment jobs of the pipeline. Production is deployed by every project; a
 // project without a development environment halts that job.

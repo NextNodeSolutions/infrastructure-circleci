@@ -2,9 +2,12 @@ import { createPrivateKey, sign } from 'node:crypto'
 
 import * as v from 'valibot'
 
-import { PROJECT_NAME } from './domain/configuration/project-name.ts'
-import { decode, ReportingError, request } from './github-transport.ts'
-import { SECONDS_PER_MINUTE, MILLISECONDS_PER_SECOND } from './lib/time.ts'
+import { PositiveId, Revision } from '../../domain/approval/record.ts'
+import { PROJECT_NAME } from '../../domain/configuration/project-name.ts'
+import { GitHubCredentials } from '../../domain/vault/platform-secrets.ts'
+import { SECONDS_PER_MINUTE, MILLISECONDS_PER_SECOND } from '../../lib/time.ts'
+
+import { decode, ReportingError, request } from './transport.ts'
 
 const JWT_MINUTES = 9
 const JWT_SECONDS = JWT_MINUTES * SECONDS_PER_MINUTE
@@ -17,8 +20,6 @@ const PERMISSIONS = {
 	approve: APPROVAL_PERMISSIONS,
 	verify: { ...APPROVAL_PERMISSIONS, checks: 'read' },
 } as const
-export const PositiveId = v.pipe(v.number(), v.integer(), v.minValue(1))
-export const Revision = v.pipe(v.string(), v.regex(/^[0-9a-f]{40}$/))
 export const Pull = v.object({
 	number: PositiveId,
 	merged_at: v.nullable(v.string()),
@@ -30,21 +31,15 @@ export const Pull = v.object({
 	}),
 })
 export type Pull = v.InferOutput<typeof Pull>
-export const GitHubCredentials = v.object({
-	GITHUB_APP_ID: v.pipe(v.string(), v.regex(/^[1-9][0-9]*$/)),
-	GITHUB_APP_INSTALLATION_ID: v.pipe(v.string(), v.regex(/^[1-9][0-9]*$/)),
-	GITHUB_APP_PRIVATE_KEY: v.pipe(v.string(), v.nonEmpty()),
-})
+export const Login = v.pipe(v.string(), v.regex(/^[A-Za-z0-9-]+$/))
 const Installation = v.object({
 	app_id: PositiveId,
-	account: v.object({
-		login: v.pipe(v.string(), v.regex(/^[A-Za-z0-9-]+$/)),
-	}),
+	account: v.object({ login: Login }),
 	events: v.array(v.string()),
 })
 const Token = v.object({ token: v.pipe(v.string(), v.nonEmpty()) })
 
-function jwt(credentials: v.InferOutput<typeof GitHubCredentials>): string {
+function jwt(credentials: GitHubCredentials): string {
 	try {
 		const now = Math.floor(Date.now() / MILLISECONDS_PER_SECOND)
 		const encode = (value: unknown): string =>
@@ -100,9 +95,7 @@ export class GitHubApi {
 		return { authorization, path, installation }
 	}
 
-	static verifySigning(
-		credentials: v.InferOutput<typeof GitHubCredentials>,
-	): void {
+	static verifySigning(credentials: GitHubCredentials): void {
 		jwt(credentials)
 	}
 

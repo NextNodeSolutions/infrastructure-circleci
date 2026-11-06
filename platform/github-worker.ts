@@ -1,22 +1,18 @@
 import * as v from 'valibot'
 
-import { ApprovalEvent } from './src/approval-record.ts'
-import {
-	ApprovalDenied,
-	ApprovalUnavailable,
-	authorizeApproval,
-} from './src/authorize-approval.ts'
-import { CircleApproval } from './src/circle-approval.ts'
+import { CircleApproval } from './src/adapters/circleci/approval.ts'
+import { GitHubApi } from './src/adapters/github/api.ts'
+import { GitHubApproval } from './src/adapters/github/approval.ts'
+import { decode } from './src/adapters/github/transport.ts'
+import { verifyWebhook } from './src/adapters/github/webhook.ts'
+import { authorizeApproval } from './src/domain/approval/authorize.ts'
+import { ApprovalDenied, ApprovalError } from './src/domain/approval/errors.ts'
+import { ApprovalEvent } from './src/domain/approval/record.ts'
+import { GITHUB_WEBHOOK } from './src/domain/approval/service.ts'
 import { PlatformError } from './src/domain/platform-error.ts'
-import { GITHUB_WEBHOOK } from './src/domain/service/approval-service.ts'
-import { GitHubApi } from './src/github-api.ts'
-import { GitHubApproval } from './src/github-approval.ts'
-import { WorkerSecrets } from './src/github-service-config.ts'
-import { decode } from './src/github-transport.ts'
-import { verifyWebhook } from './src/verify-webhook.ts'
+import { WorkerSecrets } from './src/domain/vault/platform-secrets.ts'
 
 const HTTP_NOT_FOUND = 404
-const HTTP_FORBIDDEN = 403
 const HTTP_SERVICE_UNAVAILABLE = 503
 const FAILURE = 'Approval service operation failed'
 const RequestedAction = v.looseObject({ action: v.literal('requested_action') })
@@ -111,13 +107,11 @@ async function webhook(
 
 function refused(error: unknown): Response {
 	const status =
-		error instanceof ApprovalDenied || error instanceof ApprovalUnavailable
-			? error.status
-			: HTTP_SERVICE_UNAVAILABLE
+		error instanceof ApprovalError ? error.status : HTTP_SERVICE_UNAVAILABLE
 	const reason = PlatformError.describe(error, FAILURE)
 	console.error(JSON.stringify({ event: 'approval-refused', status, reason }))
 	const message =
-		status === HTTP_FORBIDDEN
+		error instanceof ApprovalDenied
 			? 'Approval refused'
 			: 'Approval could not complete. Retry from GitHub.'
 	return Response.json({ approved: false, error: message }, { status })

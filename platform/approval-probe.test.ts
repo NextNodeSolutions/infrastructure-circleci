@@ -3,19 +3,19 @@ import { createHmac } from 'node:crypto'
 import test from 'node:test'
 
 import { APPROVAL_PROBE } from './approval-probe-fixtures.ts'
-import { APPROVAL_CHECK } from './src/approval-record.ts'
+import { verifyWebhook } from './src/adapters/github/webhook.ts'
 import {
 	authorizeApproval,
 	verifyProductionApproval,
-} from './src/authorize-approval.ts'
-import { verifyWebhook } from './src/verify-webhook.ts'
+} from './src/domain/approval/authorize.ts'
+import { APPROVAL_CHECK } from './src/domain/approval/record.ts'
 
 import type {
 	Actor,
 	Approval,
 	ApprovalCircleCI,
 	ApprovalGitHub,
-} from './src/approval-record.ts'
+} from './src/domain/approval/record.ts'
 
 const { release: RELEASE, actor: ACTOR, event: EVENT } = APPROVAL_PROBE
 

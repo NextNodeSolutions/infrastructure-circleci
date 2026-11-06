@@ -2,8 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { APPROVAL_PROBE as probe } from './approval-probe-fixtures.ts'
-import { ApprovalDenied } from './src/authorize-approval.ts'
-import { CircleApproval } from './src/circle-approval.ts'
+import { CircleApproval } from './src/adapters/circleci/approval.ts'
+import { ApprovalDenied } from './src/domain/approval/errors.ts'
 
 import type { TestContext } from 'node:test'
 

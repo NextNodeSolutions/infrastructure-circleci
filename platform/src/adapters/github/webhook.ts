@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 
-import { ApprovalDenied } from './authorize-approval.ts'
+import { ApprovalDenied } from '../../domain/approval/errors.ts'
 
 const BYTES_PER_KIB = 1024
 const MAX_BODY_KIB = 256
