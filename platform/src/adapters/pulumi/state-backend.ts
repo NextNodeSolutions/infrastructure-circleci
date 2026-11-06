@@ -5,12 +5,12 @@ import { createHash } from 'node:crypto'
 
 import * as v from 'valibot'
 
+import { REQUEST_TIMEOUT_MS } from '../http.ts'
+
 const Verification = v.object({
 	success: v.literal(true),
 	result: v.object({ id: v.string() }),
 })
-
-const TOKEN_VERIFY_TIMEOUT_MS = 15_000
 
 export type StateBackend = { url: string; env: Record<string, string> }
 
@@ -22,7 +22,7 @@ async function tokenId(token: string): Promise<string> {
 		{
 			headers: { authorization: `Bearer ${token}` },
 			redirect: 'error',
-			signal: AbortSignal.timeout(TOKEN_VERIFY_TIMEOUT_MS),
+			signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
 		},
 	)
 	const body: unknown = await response.json()

@@ -11,6 +11,7 @@ import { CircleApproval } from './src/adapters/circleci/approval.ts'
 import { env } from './src/adapters/cli.ts'
 import { GitHubApi } from './src/adapters/github/api.ts'
 import { decode } from './src/adapters/github/transport.ts'
+import { REQUEST_TIMEOUT_MS } from './src/adapters/http.ts'
 import { stackHasResource } from './src/adapters/pulumi/checkpoint.ts'
 import { selectStack } from './src/adapters/pulumi/stack.ts'
 import { r2StateBackend } from './src/adapters/pulumi/state-backend.ts'
@@ -31,7 +32,6 @@ const HEALTH_DEADLINE_MINUTES = 10
 const HEALTH_DEADLINE_MS =
 	HEALTH_DEADLINE_MINUTES * SECONDS_PER_MINUTE * MILLISECONDS_PER_SECOND
 const HEALTH_RETRY_MS = 3_000
-const HEALTH_TIMEOUT_MS = 15_000
 const WRANGLER_OUTPUT = 'wrangler.ndjson'
 const DOMAIN_RESOURCE = 'domain'
 class ServiceDeploymentError extends PlatformError {}
@@ -81,7 +81,7 @@ async function isHealthy(secrets: WorkerSecrets, base: URL): Promise<boolean> {
 	try {
 		const response = await fetch(new URL('/health', base), {
 			redirect: 'error',
-			signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS),
+			signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
 		})
 		if (!response.ok) return false
 		const body = '{}'
@@ -96,7 +96,7 @@ async function isHealthy(secrets: WorkerSecrets, base: URL): Promise<boolean> {
 				'x-hub-signature-256': `sha256=${signature}`,
 			},
 			redirect: 'error',
-			signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS),
+			signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
 		})
 		return ping.ok
 	} catch {

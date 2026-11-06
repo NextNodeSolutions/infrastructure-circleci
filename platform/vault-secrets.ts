@@ -2,9 +2,8 @@ import { spawnSync } from 'node:child_process'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 
-import * as v from 'valibot'
-
 import { PlatformSecrets } from './src/domain/vault/platform-secrets.ts'
+import { decodeOr } from './src/lib/decode.ts'
 
 class VaultExportError extends Error {}
 
@@ -88,19 +87,18 @@ function main(): void {
 	const secrets = Object.keys(PlatformSecrets[values.scope].entries).map(
 		key => secret(key, project, domain),
 	)
-	const parsed = v.safeParse(
+	const credentials = decodeOr(
 		PlatformSecrets[values.scope],
 		Object.fromEntries(secrets.map(({ key, value }) => [key, value])),
+		fields =>
+			new VaultExportError(`Invalid required credentials: ${fields}`),
+		'credentials',
 	)
-	if (!parsed.success)
-		throw new VaultExportError(
-			`Invalid required credentials: ${parsed.issues.flatMap(issue => issue.path?.map(part => String(part.key)) ?? []).join(', ')}`,
-		)
 	if (values.format === 'json') {
 		console.error(
 			`runtime credentials: ${secrets.map(({ key }) => key).join(', ')}`,
 		)
-		process.stdout.write(JSON.stringify(parsed.output))
+		process.stdout.write(JSON.stringify(credentials))
 		return
 	}
 	render(secrets)

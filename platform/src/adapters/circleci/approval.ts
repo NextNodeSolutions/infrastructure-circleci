@@ -5,6 +5,8 @@ import {
 	ApprovalUnavailable,
 } from '../../domain/approval/errors.ts'
 import { Revision } from '../../domain/approval/record.ts'
+import { decodeOr } from '../../lib/decode.ts'
+import { requestJson } from '../http.ts'
 
 import type {
 	ApprovalCircleCI,
@@ -13,7 +15,6 @@ import type {
 } from '../../domain/approval/record.ts'
 
 const API = 'https://circleci.com/api/v2'
-const TIMEOUT_MS = 15_000
 const Workflow = v.object({
 	id: v.string(),
 	status: v.string(),
@@ -42,12 +43,14 @@ function decode<TSchema extends v.GenericSchema>(
 	schema: TSchema,
 	input: unknown,
 ): v.InferOutput<TSchema> {
-	const parsed = v.safeParse(schema, input)
-	if (!parsed.success)
-		throw new ApprovalUnavailable(
-			`Invalid CircleCI response fields: ${parsed.issues.map(issue => v.getDotPath(issue) ?? 'response').join(', ')}`,
-		)
-	return parsed.output
+	return decodeOr(
+		schema,
+		input,
+		fields =>
+			new ApprovalUnavailable(
+				`Invalid CircleCI response fields: ${fields}`,
+			),
+	)
 }
 
 export class CircleApproval implements ApprovalCircleCI {
@@ -61,28 +64,23 @@ export class CircleApproval implements ApprovalCircleCI {
 		this.token = token
 	}
 
-	private async request(path: string, method = 'GET'): Promise<unknown> {
-		try {
-			const response = await fetch(`${API}${path}`, {
+	private request(path: string, method = 'GET'): Promise<unknown> {
+		return requestJson(
+			`${API}${path}`,
+			{
 				method,
 				headers: {
 					'Circle-Token': this.token,
 					'Content-Type': 'application/json',
 				},
-				redirect: 'manual',
-				signal: AbortSignal.timeout(TIMEOUT_MS),
-			})
-			if (!response.ok)
-				throw new ApprovalUnavailable(
-					`CircleCI approval request failed with HTTP ${response.status}`,
-				)
-			return await response.json()
-		} catch (error) {
-			if (error instanceof ApprovalUnavailable) throw error
-			throw new ApprovalUnavailable(
-				`CircleCI approval could not complete its API request: ${error instanceof Error ? error.message : 'unknown error'}`,
-			)
-		}
+			},
+			failure =>
+				new ApprovalUnavailable(
+					'status' in failure
+						? `CircleCI approval request failed with HTTP ${failure.status}`
+						: `CircleCI approval could not complete its API request: ${failure.cause}`,
+				),
+		)
 	}
 
 	async verifyAccess(): Promise<void> {

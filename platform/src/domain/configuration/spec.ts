@@ -3,6 +3,7 @@
 // program, read this file and never the project's files again.
 import * as v from 'valibot'
 
+import { decodeOr } from '../../lib/decode.ts'
 import { PlatformError } from '../platform-error.ts'
 
 import { Environment, HealthPath, Hostname } from './nextnode-toml.ts'
@@ -31,10 +32,13 @@ export const Spec = v.object({
 export type Spec = v.InferOutput<typeof Spec>
 
 export function parseSpec(json: unknown, source: string): Spec {
-	const parsed = v.safeParse(Spec, json)
-	if (!parsed.success)
-		throw new PlatformError(
-			`${source}: invalid deployment fields: ${parsed.issues.map(issue => v.getDotPath(issue) ?? 'spec').join(', ')}. Regenerate it with the read step.`,
-		)
-	return parsed.output
+	return decodeOr(
+		Spec,
+		json,
+		fields =>
+			new PlatformError(
+				`${source}: invalid deployment fields: ${fields}. Regenerate it with the read step.`,
+			),
+		'spec',
+	)
 }

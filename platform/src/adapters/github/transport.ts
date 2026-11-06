@@ -1,11 +1,12 @@
-import * as v from 'valibot'
-
 import { PlatformError } from '../../domain/platform-error.ts'
+import { decodeOr } from '../../lib/decode.ts'
+import { requestJson } from '../http.ts'
+
+import type * as v from 'valibot'
 
 const API = 'https://api.github.com'
 // Release verification needs merge_commit_sha, removed in REST 2026-03-10.
 const API_VERSION = '2022-11-28'
-const TIMEOUT_MS = 15_000
 const READ_ATTEMPTS = 3
 const RETRY_DELAY_MS = 1_000
 const HTTP_SERVER_ERROR = 500
@@ -22,12 +23,14 @@ export function decode<TSchema extends v.GenericSchema>(
 	schema: TSchema,
 	input: unknown,
 ): v.InferOutput<TSchema> {
-	const parsed = v.safeParse(schema, input)
-	if (!parsed.success)
-		throw new ReportingError(
-			`Invalid GitHub configuration or response fields: ${parsed.issues.map(issue => v.getDotPath(issue) ?? 'response').join(', ')}`,
-		)
-	return parsed.output
+	return decodeOr(
+		schema,
+		input,
+		fields =>
+			new ReportingError(
+				`Invalid GitHub configuration or response fields: ${fields}`,
+			),
+	)
 }
 
 export function isNotFound(error: unknown): boolean {
@@ -80,10 +83,11 @@ async function attempt(call: Call, count: number): Promise<unknown> {
 	}
 }
 
-async function send(call: Call): Promise<unknown> {
+function send(call: Call): Promise<unknown> {
 	const { authorization, path, method, body } = call
-	try {
-		const response = await fetch(`${API}${path}`, {
+	return requestJson(
+		`${API}${path}`,
+		{
 			method,
 			headers: {
 				Authorization: `Bearer ${authorization}`,
@@ -93,19 +97,15 @@ async function send(call: Call): Promise<unknown> {
 				'User-Agent': 'nextnode-ci-checks',
 			},
 			...encoded(body),
-			redirect: 'manual',
-			signal: AbortSignal.timeout(TIMEOUT_MS),
-		})
-		if (!response.ok)
-			throw new ReportingError(
-				`GitHub reporting failed: ${method} ${path} returned HTTP ${response.status}`,
-				response.status,
-			)
-		return await response.json()
-	} catch (error) {
-		if (error instanceof ReportingError) throw error
-		throw new ReportingError(
-			`GitHub reporting could not complete its API request: ${error instanceof Error ? error.message : 'unknown error'}`,
-		)
-	}
+		},
+		failure =>
+			'status' in failure
+				? new ReportingError(
+						`GitHub reporting failed: ${method} ${path} returned HTTP ${failure.status}`,
+						failure.status,
+					)
+				: new ReportingError(
+						`GitHub reporting could not complete its API request: ${failure.cause}`,
+					),
+	)
 }
