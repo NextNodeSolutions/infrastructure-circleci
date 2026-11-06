@@ -1,11 +1,12 @@
 import { spawnSync } from 'node:child_process'
-import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 
+import { emitExports } from './src/adapters/shell/exports.ts'
+import { PlatformError } from './src/domain/platform-error.ts'
 import { PlatformSecrets } from './src/domain/vault/platform-secrets.ts'
 import { decodeOr } from './src/lib/decode.ts'
 
-class VaultExportError extends Error {}
+class VaultExportError extends PlatformError {}
 
 const MISSING_SECRET = '*not found*'
 
@@ -48,21 +49,6 @@ function secret(
 	return { key, value }
 }
 
-function render(secrets: { key: string; value: string }[]): void {
-	const rendered = spawnSync(
-		process.execPath,
-		[join(import.meta.dirname, 'env-file.ts')],
-		{
-			input: JSON.stringify(secrets),
-			stdio: ['pipe', 'inherit', 'inherit'],
-		},
-	)
-	if (rendered.error || rendered.status !== 0)
-		throw new VaultExportError(
-			'Cannot render the scoped platform credentials',
-		)
-}
-
 function main(): void {
 	const { values } = parseArgs({
 		options: {
@@ -81,7 +67,7 @@ function main(): void {
 		!['shell', 'json'].includes(values.format)
 	) {
 		throw new VaultExportError(
-			'--scope resources|reporting|runtime, --format shell|json, INFISICAL_PLATFORM_PROJECT_ID, INFISICAL_DOMAIN and INFISICAL_TOKEN are required',
+			`--scope ${Object.keys(PlatformSecrets).join('|')}, --format shell|json, INFISICAL_PLATFORM_PROJECT_ID, INFISICAL_DOMAIN and INFISICAL_TOKEN are required`,
 		)
 	}
 	const secrets = Object.keys(PlatformSecrets[values.scope].entries).map(
@@ -96,21 +82,22 @@ function main(): void {
 	)
 	if (values.format === 'json') {
 		console.error(
-			`runtime credentials: ${secrets.map(({ key }) => key).join(', ')}`,
+			`${values.scope} credentials: ${secrets.map(({ key }) => key).join(', ')}`,
 		)
 		process.stdout.write(JSON.stringify(credentials))
 		return
 	}
-	render(secrets)
+	emitExports(secrets)
 }
 
 try {
 	main()
 } catch (error) {
 	console.error(
-		error instanceof VaultExportError
-			? error.message
-			: 'Scoped platform credential export failed',
+		PlatformError.describe(
+			error,
+			'Scoped platform credential export failed',
+		),
 	)
 	process.exitCode = 1
 }

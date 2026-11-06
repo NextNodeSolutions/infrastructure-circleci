@@ -4,8 +4,6 @@
 import { text } from 'node:stream/consumers'
 
 import { secretsOf } from './src/adapters/infisical/export.ts'
-import { exportSecrets } from './src/adapters/shell/exports.ts'
+import { emitExports } from './src/adapters/shell/exports.ts'
 
-const { exports, names } = exportSecrets(secretsOf(await text(process.stdin)))
-process.stdout.write(exports)
-process.stderr.write(`${names.length} secret(s): ${names.join(', ')}\n`)
+emitExports(secretsOf(await text(process.stdin)))
