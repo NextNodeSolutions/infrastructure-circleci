@@ -8,7 +8,7 @@ import { verifyWebhook } from './src/adapters/github/webhook.ts'
 import { authorizeApproval } from './src/domain/approval/authorize.ts'
 import { ApprovalDenied, ApprovalError } from './src/domain/approval/errors.ts'
 import { ApprovalEvent } from './src/domain/approval/record.ts'
-import { GITHUB_WEBHOOK } from './src/domain/approval/service.ts'
+import { GITHUB_HEALTH, GITHUB_WEBHOOK } from './src/domain/approval/service.ts'
 import { PlatformError } from './src/domain/platform-error.ts'
 import { WorkerSecrets } from './src/domain/vault/platform-secrets.ts'
 
@@ -18,7 +18,7 @@ const FAILURE = 'Approval service operation failed'
 const RequestedAction = v.looseObject({ action: v.literal('requested_action') })
 
 function isHealthRequest(request: Request, url: URL): boolean {
-	return request.method === 'GET' && url.pathname === '/health'
+	return request.method === 'GET' && url.pathname === GITHUB_HEALTH.pathname
 }
 
 function isWebhookRequest(request: Request, url: URL): boolean {

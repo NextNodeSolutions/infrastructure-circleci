@@ -18,6 +18,7 @@ import { r2StateBackend } from './src/adapters/pulumi/state-backend.ts'
 import { zoneForDomain } from './src/adapters/pulumi/zone-for-domain.ts'
 import { readUpload } from './src/adapters/wrangler/output.ts'
 import {
+	GITHUB_HEALTH,
 	GITHUB_SERVICE,
 	GITHUB_WEBHOOK,
 } from './src/domain/approval/service.ts'
@@ -46,7 +47,7 @@ async function resources(accountId: string): Promise<Record<string, unknown>> {
 			accountId,
 			zoneId: zone.id,
 			hostname: GITHUB_SERVICE.hostname,
-			service: GITHUB_SERVICE.name,
+			service: GITHUB_SERVICE.worker.name,
 		},
 		{ deleteBeforeReplace: true },
 	)
@@ -79,7 +80,7 @@ function wrangler(arguments_: string[], directory: string): void {
 
 async function isHealthy(secrets: WorkerSecrets, base: URL): Promise<boolean> {
 	try {
-		const response = await fetch(new URL('/health', base), {
+		const response = await fetch(new URL(GITHUB_HEALTH.pathname, base), {
 			redirect: 'error',
 			signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
 		})
@@ -128,8 +129,7 @@ function writeUploadFiles(
 	writeFileSync(
 		config,
 		JSON.stringify({
-			...GITHUB_SERVICE,
-			hostname: undefined,
+			...GITHUB_SERVICE.worker,
 			main: join(import.meta.dirname, 'github-worker.ts'),
 			keep_vars: true,
 			workers_dev: false,
@@ -211,7 +211,7 @@ async function serviceStack(workDir: string): Promise<automation.Stack> {
 		bucket: env('NEXTNODE_STATE_BUCKET'),
 	})
 	return selectStack({
-		project: `platform.${GITHUB_SERVICE.name}`,
+		project: `platform.${GITHUB_SERVICE.worker.name}`,
 		stackName: 'production',
 		program: resources,
 		accountId,
@@ -248,15 +248,13 @@ async function main(): Promise<void> {
 	const hasDomain = await stackHasResource(stack, DOMAIN_RESOURCE)
 	await publishVersion(directory, secrets, hasDomain ? 'update' : 'create')
 	await stack.up({ onOutput })
-	await awaitHealth(secrets, new URL(`https://${GITHUB_SERVICE.hostname}`))
+	await awaitHealth(secrets, new URL(GITHUB_HEALTH.origin))
 	await GitHubApi.configureWebhook(
 		secrets,
 		GITHUB_WEBHOOK,
 		secrets.GITHUB_WEBHOOK_SECRET,
 	)
-	console.log(
-		`GitHub approval service: https://${GITHUB_SERVICE.hostname}/health`,
-	)
+	console.log(`GitHub approval service: ${GITHUB_HEALTH.href}`)
 }
 
 await main().catch((error: unknown) => {
