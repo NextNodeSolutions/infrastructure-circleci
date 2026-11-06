@@ -31,6 +31,20 @@ export const Pull = v.object({
 	}),
 })
 export type Pull = v.InferOutput<typeof Pull>
+
+// A pull request merged into the repository's main as the given revision.
+export function isMergeOf(
+	pull: Pull,
+	repository: string,
+	revision: string,
+): boolean {
+	return (
+		Boolean(pull.merged_at) &&
+		pull.merge_commit_sha === revision &&
+		pull.base.ref === 'main' &&
+		pull.base.repo.full_name === repository
+	)
+}
 export const Login = v.pipe(v.string(), v.regex(/^[A-Za-z0-9-]+$/))
 const Installation = v.object({
 	app_id: PositiveId,

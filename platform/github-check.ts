@@ -4,12 +4,15 @@ import * as v from 'valibot'
 
 import { GitHubApi } from './src/adapters/github/api.ts'
 import { GitHubApproval } from './src/adapters/github/approval.ts'
-import { GitHubChecks } from './src/adapters/github/checks.ts'
+import { mergedPull, ReleaseChecks } from './src/adapters/github/checks.ts'
 import { decode, ReportingError } from './src/adapters/github/transport.ts'
 import { readSpec } from './src/adapters/platform-files.ts'
 import { verifyProductionApproval } from './src/domain/approval/authorize.ts'
 import { Release } from './src/domain/approval/record.ts'
 import { PlatformError } from './src/domain/platform-error.ts'
+
+import type { Pull } from './src/adapters/github/api.ts'
+import type { Environment } from './src/domain/configuration/nextnode-toml.ts'
 
 const CircleContext = v.object({
 	CIRCLE_BRANCH: v.literal('main'),
@@ -19,161 +22,104 @@ const CircleContext = v.object({
 	CIRCLE_PROJECT_ID: Release.entries.project,
 })
 type Context = {
-	checks: GitHubChecks
+	checks: ReleaseChecks
 	approval: GitHubApproval
-	release: v.InferOutput<typeof Release>
-	pull: Awaited<ReturnType<GitHubChecks['mergedPull']>>
-	hasDevelopment: boolean
-	urls: Record<string, string>
+	release: Release
+	pull: Pull
+	urls: Partial<Record<Environment, string>>
 }
 
 async function start(context: Context): Promise<void> {
-	await context.checks.publish(
-		context.pull,
-		context.release.revision,
-		context.release.workflow,
-		{
-			environment: 'development',
-			status: 'queued',
-			summary: 'Development awaits the main-branch checks',
-		},
-	)
-	await context.checks.publish(
-		context.pull,
-		context.release.revision,
-		context.release.workflow,
-		{
-			environment: 'production',
-			status: 'queued',
-			summary: 'Production awaits development and GitHub approval',
-		},
-	)
+	await context.checks.publish({
+		environment: 'development',
+		status: 'queued',
+		summary: 'Development awaits the main-branch checks',
+	})
+	await context.checks.publish({
+		environment: 'production',
+		status: 'queued',
+		summary: 'Production awaits development and GitHub approval',
+	})
 }
 
 async function checksFailed(context: Context): Promise<void> {
-	await context.checks.publish(
-		context.pull,
-		context.release.revision,
-		context.release.workflow,
-		{
-			environment: 'development',
-			status: 'completed',
-			conclusion: 'skipped',
-			summary:
-				'Development was not deployed because main-branch checks failed',
-		},
-	)
-	await context.checks.publish(
-		context.pull,
-		context.release.revision,
-		context.release.workflow,
-		{
-			environment: 'production',
-			status: 'completed',
-			conclusion: 'skipped',
-			summary:
-				'Production was not deployed because main-branch checks failed',
-		},
-	)
+	await context.checks.publish({
+		environment: 'development',
+		status: 'completed',
+		conclusion: 'skipped',
+		summary:
+			'Development was not deployed because main-branch checks failed',
+	})
+	await context.checks.publish({
+		environment: 'production',
+		status: 'completed',
+		conclusion: 'skipped',
+		summary:
+			'Production was not deployed because main-branch checks failed',
+	})
 }
 
 async function developmentStarted(context: Context): Promise<void> {
-	await context.checks.publish(
-		context.pull,
-		context.release.revision,
-		context.release.workflow,
-		{
-			environment: 'development',
-			status: 'in_progress',
-			summary: 'Development deployment is running',
-		},
-	)
+	await context.checks.publish({
+		environment: 'development',
+		status: 'in_progress',
+		summary: 'Development deployment is running',
+	})
 }
 
 async function developmentSucceeded(context: Context): Promise<void> {
-	await context.checks.publish(
-		context.pull,
-		context.release.revision,
-		context.release.workflow,
-		{
-			environment: 'development',
-			status: 'completed',
-			conclusion: context.hasDevelopment ? 'success' : 'skipped',
-			summary: context.hasDevelopment
-				? 'Development deployment passed its health check'
-				: 'This project declares no development environment',
-			url: context.urls.development,
-		},
-	)
+	await context.checks.publish({
+		environment: 'development',
+		status: 'completed',
+		conclusion: context.urls.development ? 'success' : 'skipped',
+		summary: context.urls.development
+			? 'Development deployment passed its health check'
+			: 'This project declares no development environment',
+		url: context.urls.development,
+	})
 	await context.approval.create(context.release, context.pull.head.sha)
 }
 
 async function developmentFailed(context: Context): Promise<void> {
-	await context.checks.publish(
-		context.pull,
-		context.release.revision,
-		context.release.workflow,
-		{
-			environment: 'development',
-			status: 'completed',
-			conclusion: 'failure',
-			summary: 'Development failed. Production has not been released.',
-		},
-	)
-	await context.checks.publish(
-		context.pull,
-		context.release.revision,
-		context.release.workflow,
-		{
-			environment: 'production',
-			status: 'completed',
-			conclusion: 'skipped',
-			summary: 'Production was skipped because development failed',
-		},
-	)
+	await context.checks.publish({
+		environment: 'development',
+		status: 'completed',
+		conclusion: 'failure',
+		summary: 'Development failed. Production has not been released.',
+	})
+	await context.checks.publish({
+		environment: 'production',
+		status: 'completed',
+		conclusion: 'skipped',
+		summary: 'Production was skipped because development failed',
+	})
 }
 
 async function productionStarted(context: Context): Promise<void> {
-	await context.checks.publish(
-		context.pull,
-		context.release.revision,
-		context.release.workflow,
-		{
-			environment: 'production',
-			status: 'in_progress',
-			summary:
-				'GitHub approval verified. Production deployment is running.',
-		},
-	)
+	await context.checks.publish({
+		environment: 'production',
+		status: 'in_progress',
+		summary: 'GitHub approval verified. Production deployment is running.',
+	})
 }
 
 async function productionSucceeded(context: Context): Promise<void> {
-	await context.checks.publish(
-		context.pull,
-		context.release.revision,
-		context.release.workflow,
-		{
-			environment: 'production',
-			status: 'completed',
-			conclusion: 'success',
-			summary: 'Production passed its health check and is serving',
-			url: context.urls.production,
-		},
-	)
+	await context.checks.publish({
+		environment: 'production',
+		status: 'completed',
+		conclusion: 'success',
+		summary: 'Production passed its health check and is serving',
+		url: context.urls.production,
+	})
 }
 
 async function productionFailed(context: Context): Promise<void> {
-	await context.checks.publish(
-		context.pull,
-		context.release.revision,
-		context.release.workflow,
-		{
-			environment: 'production',
-			status: 'completed',
-			conclusion: 'failure',
-			summary: 'Production deployment failed',
-		},
-	)
+	await context.checks.publish({
+		environment: 'production',
+		status: 'completed',
+		conclusion: 'failure',
+		summary: 'Production deployment failed',
+	})
 }
 
 async function verifyProduction(context: Context): Promise<void> {
@@ -222,27 +168,24 @@ async function main(): Promise<void> {
 		environment.CIRCLE_PROJECT_REPONAME,
 		values.phase === 'verify-production' ? 'verify' : 'report',
 	)
-	const checks = new GitHubChecks(api)
-	const pull = await checks.mergedPull(environment.CIRCLE_SHA1)
+	const pull = await mergedPull(api, environment.CIRCLE_SHA1)
 	const release = {
 		workflow: environment.CIRCLE_WORKFLOW_ID,
 		project: environment.CIRCLE_PROJECT_ID,
 		revision: environment.CIRCLE_SHA1,
 		pull: pull.number,
 	}
-	const urls = Object.fromEntries(
-		Object.entries(spec.domains).map(([environment, domain]) => [
-			environment,
-			`https://${domain}`,
-		]),
-	)
 	await HANDLERS[values.phase]({
-		checks,
+		checks: new ReleaseChecks(api, release, pull),
 		approval: new GitHubApproval(api),
 		release,
 		pull,
-		hasDevelopment: Boolean(spec.domains.development),
-		urls,
+		urls: Object.fromEntries(
+			Object.entries(spec.domains).map(([name, domain]) => [
+				name,
+				`https://${domain}`,
+			]),
+		),
 	})
 }
 

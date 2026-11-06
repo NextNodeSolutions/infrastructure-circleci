@@ -10,7 +10,7 @@ import {
 	PositiveId,
 } from '../../domain/approval/record.ts'
 
-import { Login, Pull } from './api.ts'
+import { isMergeOf, Login, Pull } from './api.ts'
 import { decode, isNotFound } from './transport.ts'
 
 import type {
@@ -86,12 +86,9 @@ export class GitHubApproval implements ApprovalGitHub {
 		pull: Pull,
 	): Approval {
 		if (
-			!pull.merged_at ||
+			!isMergeOf(pull, this.api.repository, record.revision) ||
 			pull.number !== record.pull ||
-			pull.merge_commit_sha !== record.revision ||
-			pull.head.sha !== check.head_sha ||
-			pull.base.ref !== 'main' ||
-			pull.base.repo.full_name !== this.api.repository
+			pull.head.sha !== check.head_sha
 		) {
 			throw new ApprovalDenied(
 				'The approval must identify the original merged pull request and its deployment revision',
@@ -204,11 +201,8 @@ export class GitHubApproval implements ApprovalGitHub {
 		)
 		const isCurrent = pulls.some(
 			pull =>
-				pull.merged_at &&
 				pull.number === record.pull &&
-				pull.merge_commit_sha === record.revision &&
-				pull.base.ref === 'main' &&
-				pull.base.repo.full_name === this.api.repository,
+				isMergeOf(pull, this.api.repository, record.revision),
 		)
 		if (!isCurrent)
 			throw new ApprovalDenied(

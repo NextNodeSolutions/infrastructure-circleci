@@ -2,9 +2,10 @@ import * as v from 'valibot'
 
 import { PositiveId, Revision } from '../../domain/approval/record.ts'
 
-import { PAGE_SIZE, Pull } from './api.ts'
+import { isMergeOf, PAGE_SIZE, Pull } from './api.ts'
 import { decode, ReportingError } from './transport.ts'
 
+import type { Release } from '../../domain/approval/record.ts'
 import type { Environment } from '../../domain/configuration/nextnode-toml.ts'
 import type { GitHubApi } from './api.ts'
 
@@ -74,55 +75,52 @@ function startOf(report: Report): { started_at: string } | undefined {
 	return { started_at: new Date().toISOString() }
 }
 
-export class GitHubChecks {
+// The merged pull request the deployment commit came from.
+export async function mergedPull(
+	api: GitHubApi,
+	revision: string,
+): Promise<Pull> {
+	decode(Revision, revision)
+	const pulls = decode(
+		v.array(Pull),
+		await api.read(
+			`/repos/${api.repository}/commits/${revision}/pulls?per_page=${PAGE_SIZE}`,
+		),
+	)
+	const merged = pulls.filter(pull =>
+		isMergeOf(pull, api.repository, revision),
+	)
+	const pull = merged[0]
+	if (merged.length !== 1 || !pull)
+		throw new ReportingError(
+			"The deployment commit must identify exactly one merged pull request targeting this repository's main",
+		)
+	return pull
+}
+
+// The deployment checks of one release, on the head of its merged pull request.
+export class ReleaseChecks {
 	private readonly api: GitHubApi
-	constructor(api: GitHubApi) {
+	private readonly release: Release
+	private readonly pull: Pull
+	constructor(api: GitHubApi, release: Release, pull: Pull) {
 		this.api = api
+		this.release = release
+		this.pull = pull
 	}
 
-	async mergedPull(revision: string): Promise<Pull> {
-		decode(Revision, revision)
-		const pulls = decode(
-			v.array(Pull),
-			await this.api.read(
-				`/repos/${this.api.repository}/commits/${revision}/pulls?per_page=${PAGE_SIZE}`,
-			),
-		)
-		const merged = pulls.filter(
-			pull =>
-				pull.merged_at &&
-				pull.merge_commit_sha === revision &&
-				pull.base.ref === 'main' &&
-				pull.base.repo.full_name === this.api.repository,
-		)
-		const pull = merged[0]
-		if (merged.length !== 1 || !pull)
-			throw new ReportingError(
-				"The deployment commit must identify exactly one merged pull request targeting this repository's main",
-			)
-		return pull
-	}
-
-	private async checks(
-		head: string,
-		query: Record<string, string>,
-	): Promise<v.InferOutput<typeof Check>[]> {
-		return decode(v.array(Check), await this.api.checks(head, query))
-	}
-
-	async publish(
-		pull: Pull,
-		revision: string,
-		workflow: string,
-		report: Report,
-	): Promise<void> {
+	async publish(report: Report): Promise<void> {
+		const { pull, release } = this
 		const name = `Deploy ${report.environment}`
-		const externalId = `nextnode/${workflow}/${report.environment}`
-		const checks = await this.checks(pull.head.sha, {
-			check_name: name,
-			app_id: String(this.api.appId),
-			filter: 'all',
-		})
+		const externalId = `nextnode/${release.workflow}/${report.environment}`
+		const checks = decode(
+			v.array(Check),
+			await this.api.checks(pull.head.sha, {
+				check_name: name,
+				app_id: String(this.api.appId),
+				filter: 'all',
+			}),
+		)
 		const matching = checks.filter(
 			check =>
 				check.app.id === this.api.appId &&
@@ -133,7 +131,11 @@ export class GitHubChecks {
 				'Multiple checks identify the same deployment workflow',
 			)
 		const existing = matching[0]
-		const detailsUrl = detailsUrlOf(this.api.repository, revision, report)
+		const detailsUrl = detailsUrlOf(
+			this.api.repository,
+			release.revision,
+			report,
+		)
 		const body = {
 			name,
 			external_id: externalId,
