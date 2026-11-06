@@ -7,15 +7,14 @@ import { verifyWebhook } from './src/adapters/github/webhook.ts'
 import {
 	authorizeApproval,
 	verifyProductionApproval,
-} from './src/domain/approval/authorize.ts'
+} from './src/application/approval/authorize.ts'
 import { APPROVAL_CHECK } from './src/domain/approval/record.ts'
 
 import type {
-	Actor,
-	Approval,
 	ApprovalCircleCI,
 	ApprovalGitHub,
-} from './src/domain/approval/record.ts'
+} from './src/application/ports/approval.ts'
+import type { Actor, Approval } from './src/domain/approval/record.ts'
 
 const { release: RELEASE, actor: ACTOR, event: EVENT } = APPROVAL_PROBE
 

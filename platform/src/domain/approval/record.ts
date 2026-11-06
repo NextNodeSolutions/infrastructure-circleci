@@ -47,16 +47,3 @@ export type Approval = {
 	record: ApprovalRecord
 	repository: string
 }
-
-export interface ApprovalGitHub {
-	load(checkId: number): Promise<Approval>
-	actor(id: number): Promise<Actor>
-	requireCurrent(record: ApprovalRecord): Promise<void>
-	requireMember(actor: Actor): Promise<void>
-	record(approval: Approval, actor: Actor): Promise<void>
-}
-
-export interface ApprovalCircleCI {
-	requireRelease(release: ApprovalRecord, repository: string): Promise<void>
-	approve(release: Release): Promise<void>
-}

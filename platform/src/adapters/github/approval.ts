@@ -13,12 +13,8 @@ import {
 import { isMergeOf, Login, Pull } from './api.ts'
 import { decode, isNotFound } from './transport.ts'
 
-import type {
-	Actor,
-	Approval,
-	ApprovalGitHub,
-	Release,
-} from '../../domain/approval/record.ts'
+import type { ApprovalGitHub } from '../../application/ports/approval.ts'
+import type { Actor, Approval, Release } from '../../domain/approval/record.ts'
 import type { GitHubApi } from './api.ts'
 
 const Actor = v.object({ id: PositiveId, login: Login })

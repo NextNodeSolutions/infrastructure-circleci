@@ -8,11 +8,8 @@ import { Revision } from '../../domain/approval/record.ts'
 import { decodeOr } from '../../lib/decode.ts'
 import { requestJson } from '../http.ts'
 
-import type {
-	ApprovalCircleCI,
-	ApprovalRecord,
-	Release,
-} from '../../domain/approval/record.ts'
+import type { ApprovalCircleCI } from '../../application/ports/approval.ts'
+import type { ApprovalRecord, Release } from '../../domain/approval/record.ts'
 
 const API = 'https://circleci.com/api/v2'
 const Workflow = v.object({

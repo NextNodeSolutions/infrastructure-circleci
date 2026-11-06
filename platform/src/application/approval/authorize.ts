@@ -1,12 +1,11 @@
-import { ApprovalDenied } from './errors.ts'
+import { ApprovalDenied } from '../../domain/approval/errors.ts'
 
 import type {
 	Approval,
-	ApprovalCircleCI,
 	ApprovalEvent,
-	ApprovalGitHub,
 	Release,
-} from './record.ts'
+} from '../../domain/approval/record.ts'
+import type { ApprovalCircleCI, ApprovalGitHub } from '../ports/approval.ts'
 
 export async function authorizeApproval(
 	event: ApprovalEvent,

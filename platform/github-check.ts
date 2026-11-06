@@ -7,7 +7,7 @@ import { GitHubApproval } from './src/adapters/github/approval.ts'
 import { mergedPull, ReleaseChecks } from './src/adapters/github/checks.ts'
 import { decode, ReportingError } from './src/adapters/github/transport.ts'
 import { readSpec } from './src/adapters/platform-files.ts'
-import { verifyProductionApproval } from './src/domain/approval/authorize.ts'
+import { verifyProductionApproval } from './src/application/approval/authorize.ts'
 import { Release } from './src/domain/approval/record.ts'
 import { PlatformError } from './src/domain/platform-error.ts'
 
