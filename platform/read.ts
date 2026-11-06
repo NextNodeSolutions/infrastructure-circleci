@@ -66,7 +66,7 @@ refusing(() => {
 	const environment = v.safeParse(Environment, args.environment)
 	if (!environment.success)
 		throw new Refusal(
-			`--environment ${args.environment} ${v.summarize(environment.issues)}`,
+			`--environment ${args.environment} ${environment.issues[0].message}`,
 		)
 	const read = readEnvironment(toml, environment.output, checkout)
 	// Only development may be missing: a halt reads as green, and production never halts.
