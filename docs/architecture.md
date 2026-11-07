@@ -90,7 +90,7 @@ Applications acquire the platform package from `main`. Only the exact canary pro
 
 GitHub approval constrains the reviewed production workflow, not trusted administrators. Operators who select configuration branches, change privileged startup variables, rerun historical workflows or use SSH can replace or bypass that workflow. External enforcement against those operators is outside this release. Within the reviewed workflow, approving the CircleCI hold directly cannot replace the App-owned Core decision checked before application production-secret export.
 
-Each registered repository requires its branch workflow check before merging into the default branch. The rule accepts reports only from the CircleCI Checks app and requires the branch to be up to date. Deployment approvals and the probe workflow are not pull request requirements. CircleCI's job-level **VCS Status Updates** setting is disabled to avoid publishing the same result twice.
+Each registered repository requires its branch workflow check before merging into the default branch. The rule accepts reports only from the CircleCI Checks app and requires the branch to be up to date. Deployment approvals and the probe workflow are not pull request requirements. CircleCI's **VCS Status Updates** setting is enabled, so each check job of the branch workflow is also a status of its own on the pull request, named after what it checks: the workflow check is what the rule requires, the job statuses are what a reviewer reads.
 
 The [CircleCI status updates guide](https://circleci.com/docs/guides/integration/status-updates/) defines the check's name. With the GitHub App integration, it includes the pipeline definition's identifier, so each repository must require its own observed check rather than an organization-wide name. Replacing a pipeline definition requires updating the required check before removing the old definition, or pull requests wait for a check that no longer reports.
 
@@ -200,7 +200,7 @@ Registration is a script in this repository, run once per repository by a mainta
 1. creates the CircleCI project, a pipeline definition whose configuration source is this repository's file on `main` and whose checkout source is the new repository, and a trigger on all pushes;
 2. creates the Infisical project named after the repository with its environments, and adds the machine identity as Viewer;
 3. verifies that the CircleCI Checks GitHub App has access to the repository, then runs a branch pipeline and confirms its native check completes successfully on a pull request;
-4. disables **VCS Status Updates** in the CircleCI project's advanced settings, then verifies a fresh commit receives the native check without duplicate job statuses;
+4. enables **VCS Status Updates** in the CircleCI project's advanced settings, then verifies a fresh commit receives the native check and one status per check job;
 5. creates a repository-level required-check rule for the observed branch workflow check, bound to the CircleCI Checks app, with an up-to-date branch required and no bypass. The rule targets the default branch and leaves the organization's existing pull request and squash-merge rules intact;
 6. leaves `nextnode.toml` to the project, which the standards tooling writes.
 

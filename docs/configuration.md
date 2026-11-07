@@ -4,7 +4,7 @@ This page lists what a project repository supplies to the pipeline and how a mis
 
 ```mermaid
 flowchart LR
-    T[nextnode.toml] --> X[Check step of the checks job, every environment, on every push]
+    T[nextnode.toml] --> X[Configuration check job, every environment, on every push]
     T --> R[Read step of the deployment job]
     R --> S[Spec of the environment, a JSON file of the platform user]
     R --> G[Generated Wrangler configuration, a JSON file of the platform user]
@@ -12,10 +12,10 @@ flowchart LR
     G --> U[Wrangler upload of the environment's Worker]
     S --> P[Platform package, the domain and the resources]
     S --> H[Smoke request on the health route]
-    K[package.json scripts and packageManager] --> C[Checks job and the build]
+    K[package.json scripts and packageManager] --> C[Check jobs and the build]
 ```
 
-The file is read twice by the same program. On every push, the checks job reads it for every environment and writes nothing, so a mistake fails the branch, not the deployment after the merge or the approval. The read step of each deployment job reads it again for its own environment, before any project code, refuses what the platform cannot accept, and writes two files: the spec of the environment and the Wrangler configuration of its Worker. Every later step reads those files, never `nextnode.toml` again, so a project script that rewrites it during the build changes nothing.
+The file is read twice by the same program. On every push, the configuration check job reads it for every environment and writes nothing, so a mistake fails the branch, not the deployment after the merge or the approval. The read step of each deployment job reads it again for its own environment, before any project code, refuses what the platform cannot accept, and writes two files: the spec of the environment and the Wrangler configuration of its Worker. Every later step reads those files, never `nextnode.toml` again, so a project script that rewrites it during the build changes nothing.
 
 ## nextnode.toml
 
@@ -70,8 +70,8 @@ The scripts the pipeline calls:
 
 | Script | Called by | Required |
 | --- | --- | --- |
-| `lint`, `format:check`, `type-check` | The checks job, on every push. | Yes. |
-| `test` | The checks job, when declared. | No. |
+| `lint`, `format:check`, `type-check` | The check job of the same name, on every push, each a status of its own on the pull request. | Yes. |
+| `test` | The tests check job, when declared. | No. |
 | `build` | The deployment job, as the project user, before the migrations and the upload. | Yes. |
 
 The install is frozen: a lockfile that does not match the manifest fails the first step rather than installing something else.
@@ -82,15 +82,15 @@ Every script runs as a user of its own, in an environment built from a list rath
 
 ## How a mistake is reported
 
-A mistake fails at the earliest job that can see it. A refusal of `nextnode.toml`, its NextNode keys or its Wrangler keys, happens in the check step of the checks job, on the first push, with a message that names the key or the rule, before any project code runs. The other mistakes show in the step that meets them.
+A mistake fails at the earliest job that can see it. A refusal of `nextnode.toml`, its NextNode keys or its Wrangler keys, happens in the configuration check job, on the first push, with a message that names the key or the rule, before any project code runs. The other mistakes show in the step that meets them.
 
 | Mistake | Where it shows |
 | --- | --- |
-| A file that is not valid TOML, a missing or malformed key of `nextnode.toml`, an environment the pipeline has no job for, no production environment, a refused Wrangler key, a path outside the repository, a repository name that cannot name a Worker | The check step of the checks job, on the first push, which prints the key or the rule. |
+| A file that is not valid TOML, a missing or malformed key of `nextnode.toml`, an environment the pipeline has no job for, no production environment, a refused Wrangler key, a path outside the repository, a repository name that cannot name a Worker | The configuration check job, on the first push, which prints the key or the rule. |
 | A link, a hard link or a pipe in the bundle or the assets, left by the build or committed | The copy step of the deployment job, after the build and before the upload, which names the file. |
 | An entry point the bundler cannot resolve | The bundle step of the deployment job, run as the project user, with Wrangler's own message. |
 | No Infisical project named after the repository, or two | The secrets step of the deployment job, before any project code runs. |
-| An unpinned or malformed `packageManager` | The install step of the checks job, on the first push. |
+| An unpinned or malformed `packageManager` | The install step of every check job, on the first push. |
 | A lockfile out of date | The project's install step, on the first push. On `main`, the deployment job fails at the same step, before the build. |
 | A domain whose zone is not in the platform's account | The resources step of the deployment job, from the platform package, after the upload: the Worker serves on its workers.dev URL and the domain is not attached. |
 | A health route that does not answer | The smoke step. Development has already been replaced; a production version is never promoted. |

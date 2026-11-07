@@ -4,8 +4,9 @@
 # CI file: its pipeline definition points here and checks out its own repository.
 # The project supplies nextnode.toml, a pinned packageManager and its scripts.
 #
-#   checks       nextnode.toml for every environment, then lint, formatting, types,
-#                tests of the project. No context, no secret.
+#   check        one job per check, on every push: nextnode.toml for every environment,
+#                lint, formatting, types, tests of the project. Each job is a status of
+#                its own on the pull request. No context, no secret.
 #   deploy-dev   on main. Halts right after reading nextnode.toml when the project
 #                declares no development environment.
 #   hold         released by the GitHub Core approval action.
@@ -331,7 +332,15 @@ jobs:
             set -a; . /home/circleci/platform/github.env; set +a
             node /home/circleci/platform/infrastructure/platform/github-check.ts --phase "$NEXTNODE_GITHUB_PHASE" --spec /home/circleci/platform/nextnode.json
 
-  checks:
+  check:
+    description: One check of the project, as the project user. The workflow names each job after what it checks, and CircleCI reports every job as a status of its own on the pull request.
+    parameters:
+      command:
+        type: string
+      install:
+        type: boolean
+        default: true
+        description: Install the project's dependencies first. The configuration check reads nextnode.toml alone and needs none.
     executor: node
     environment:
       <<: *canary
@@ -342,19 +351,12 @@ jobs:
       - isolate-project
       - branch-ref
       - branch-package
-      # The deployment jobs read nextnode.toml only after the merge, and production only
-      # after the approval: every environment is read here, so a mistake fails the branch.
+      - when:
+          condition: << parameters.install >>
+          steps:
+            - pnpm-install
       - project-run:
-          command: node "$HOME/platform-src/platform/read.ts" --repository "$CIRCLE_PROJECT_REPONAME" --check
-      - pnpm-install
-      - project-run:
-          command: pnpm lint
-      - project-run:
-          command: pnpm format:check
-      - project-run:
-          command: pnpm type-check
-      - project-run:
-          command: pnpm run --if-present test
+          command: << parameters.command >>
 
   deploy:
     parameters:
@@ -670,7 +672,24 @@ workflows:
         - not: << pipeline.parameters.probe >>
         - not: << pipeline.parameters.github_service >>
     jobs:
-      - checks
+      # The deployment jobs read nextnode.toml only after the merge, and production only
+      # after the approval: every environment is read here, so a mistake fails the branch.
+      - check:
+          name: configuration
+          install: false
+          command: node "$HOME/platform-src/platform/read.ts" --repository "$CIRCLE_PROJECT_REPONAME" --check
+      - check:
+          name: lint
+          command: pnpm lint
+      - check:
+          name: format
+          command: pnpm format:check
+      - check:
+          name: types
+          command: pnpm type-check
+      - check:
+          name: tests
+          command: pnpm run --if-present test
       - github-report:
           name: github-release-start
           phase: start
@@ -680,13 +699,44 @@ workflows:
       - deploy:
           name: deploy-dev
           environment: development
-          requires: [checks, github-release-start]
+          requires: [configuration, lint, format, types, tests, github-release-start]
           filters: *main
+      # A job that requires several jobs by status waits for every one of them, so one
+      # failure report exists per check: the first failed check reports, the rest find
+      # the checks already skipped.
       - github-report:
-          name: github-main-checks-failure
+          name: github-configuration-failure
           phase: checks-failed
           requires:
-            - checks: [failed, canceled]
+            - configuration: [failed, canceled]
+            - github-release-start
+          filters: *main
+      - github-report:
+          name: github-lint-failure
+          phase: checks-failed
+          requires:
+            - lint: [failed, canceled]
+            - github-release-start
+          filters: *main
+      - github-report:
+          name: github-format-failure
+          phase: checks-failed
+          requires:
+            - format: [failed, canceled]
+            - github-release-start
+          filters: *main
+      - github-report:
+          name: github-types-failure
+          phase: checks-failed
+          requires:
+            - types: [failed, canceled]
+            - github-release-start
+          filters: *main
+      - github-report:
+          name: github-tests-failure
+          phase: checks-failed
+          requires:
+            - tests: [failed, canceled]
             - github-release-start
           filters: *main
       - github-report:
